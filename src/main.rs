@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env::args, time::Instant};
+use std::{cmp::Ordering, collections::HashMap, env::args, time::Instant};
 
 use image::{io::Reader as ImageReader};
 use image::Rgb;
@@ -36,7 +36,33 @@ fn main() {
 	println!("{} has {} colors in it. Sorting most occuring to least...", filename, colors.len());
 
 	let mut sorted: Vec<(Rgb<u8>, usize)> = colors.into_iter().collect();
-	sorted.sort_by(|a, b| a.1.cmp(&b.1).reverse());
+	sorted.sort_by(|a, b| {
+		match a.1.cmp(&b.1) {
+			Ordering::Equal => {
+				match a.0.0[0].cmp(&b.0.0[0]) {
+					Ordering::Equal => {
+						match a.0.0[1].cmp(&b.0.0[1]) {
+							Ordering::Equal => {
+								match a.0.0[2].cmp(&b.0.0[2]) {
+									Ordering::Equal => {
+										panic!("Same color in count map, what?")
+									},
+									Ordering::Greater => Ordering::Less,
+									Ordering::Less => Ordering::Greater
+								}
+							},
+							Ordering::Greater => Ordering::Less,
+							Ordering::Less => Ordering::Greater
+						}
+					},
+					Ordering::Greater => Ordering::Less,
+					Ordering::Less => Ordering::Greater
+				}
+			},
+			Ordering::Greater => Ordering::Less,
+			Ordering::Less => Ordering::Greater
+		}
+	});
 
 	println!("Sorted! Selecting colors...");
 
@@ -120,7 +146,3 @@ fn rgb_difference(a: &Rgb<u8>, b: &Rgb<u8>) -> u16 {
 	//(a.0[0] as i16 - b.0[0] as i16).abs().max((a.0[1] as i16 - b.0[1] as i16).abs().max(a.0[2] as i16 - b.0[2] as i16).abs()) as u16
 	(a.0[0] as i16 - b.0[0] as i16).abs().max((a.0[1] as i16 - b.0[1] as i16).abs()).max((a.0[2] as i16 - b.0[2] as i16).abs()) as u16
 }
-
-//rd.abs().max(gd.abs().max(bd).abs()) as u16
-//Diff0: Rgb([92, 77, 40]) Rgb([92, 77, 50])
-//0.max(0.max(10))
