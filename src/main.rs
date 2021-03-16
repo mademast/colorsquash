@@ -36,33 +36,7 @@ fn main() {
 	println!("{} has {} colors in it. Sorting most occuring to least...", filename, colors.len());
 
 	let mut sorted: Vec<(Rgb<u8>, usize)> = colors.into_iter().collect();
-	sorted.sort_by(|a, b| {
-		match a.1.cmp(&b.1) {
-			Ordering::Equal => {
-				match a.0.0[0].cmp(&b.0.0[0]) {
-					Ordering::Equal => {
-						match a.0.0[1].cmp(&b.0.0[1]) {
-							Ordering::Equal => {
-								match a.0.0[2].cmp(&b.0.0[2]) {
-									Ordering::Equal => {
-										panic!("Same color in count map, what?")
-									},
-									Ordering::Greater => Ordering::Less,
-									Ordering::Less => Ordering::Greater
-								}
-							},
-							Ordering::Greater => Ordering::Less,
-							Ordering::Less => Ordering::Greater
-						}
-					},
-					Ordering::Greater => Ordering::Less,
-					Ordering::Less => Ordering::Greater
-				}
-			},
-			Ordering::Greater => Ordering::Less,
-			Ordering::Less => Ordering::Greater
-		}
-	});
+	sorted.sort_by(|a, b| {a.1.cmp(&b.1).then(a.0.0.cmp(&b.0.0).reverse())});
 
 	println!("Sorted! Selecting colors...");
 
