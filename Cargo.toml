@@ -8,7 +8,11 @@ edition = "2021"
 
 [dependencies]
 image = "0.23.14"
+rayon = "*"
 
 [dependencies.kmeans_colors]
 version = "0.3"
 default-features = false
+
+[profile.release]
+debug = true

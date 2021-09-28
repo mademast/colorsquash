@@ -3,9 +3,11 @@ use std::{collections::HashMap, env::args};
 use image::io::Reader as ImageReader;
 use image::Rgb;
 
+use rayon::prelude::*;
+
 const MAX_COLORS: usize = 256;
 
-const TOLERANCE: f32 = 0.6;
+const TOLERANCE: f32 = 0.025;
 const RGB_TOLERANCE: f32 = 10.0 * TOLERANCE;
 
 fn main() {
@@ -65,7 +67,7 @@ where
         }
     }
 
-    let mut sorted: Vec<(Rgb<u8>, usize)> = colors.into_iter().collect();
+    let mut sorted: Vec<(Rgb<u8>, usize)> = colors.into_par_iter().collect();
     sorted.sort_by(|(colour1, freq1), (colour2, freq2)| {
         freq2
             .cmp(freq1)
@@ -91,6 +93,7 @@ where
 }
 
 #[allow(clippy::many_single_char_names)]
+#[inline(always)]
 fn rgb_difference(a: &Rgb<u8>, z: &Rgb<u8>) -> f32 {
     let (a, b, c) = pixel_rgb_to_hsv(a);
     let (d, e, f) = pixel_rgb_to_hsv(z);
