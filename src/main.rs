@@ -1,12 +1,12 @@
-use std::{cmp::Ordering, collections::HashMap, env::args, time::Instant};
+use std::{collections::HashMap, env::args, time::Instant};
 
 use image::io::Reader as ImageReader;
 use image::Rgb;
 
 fn main() {
     let before = Instant::now();
-    let filename = std::env::args().skip(1).next().unwrap();
-    let outname = std::env::args().skip(2).next().unwrap();
+    let filename = args().nth(1).unwrap();
+    let outname = args().nth(2).unwrap();
     // The percent of RGB value difference a color has to surpass to be considere unique
     let tolerance = 0.6;
     let rgb_tolerance = 10.0 * tolerance;
@@ -149,6 +149,7 @@ fn rgb_difference(a: &Rgb<u8>, z: &Rgb<u8>) -> f64 {
     (((c - f) * (c - f)) + ((a - d).abs() / 90.0) + (b - e).abs()) as f64
 }
 
+#[warn(clippy::float_cmp)]
 fn pixel_rgb_to_hsv(a: &Rgb<u8>) -> (f32, f32, f32) {
     let (r, g, b) = (
         a.0[0] as f32 / 256.0,
