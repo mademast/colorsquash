@@ -75,37 +75,24 @@ fn quantize(pixels: Pixels<Rgb<u8>>) -> Vec<Rgb<u8>> {
             .then(colour2[2].cmp(&colour1[2]))
     });
 
-    println!("Sorted! Selecting colors...");
-
-    let mut sorted_iter = sorted.iter();
-
     let mut selected_colors: Vec<Rgb<u8>> = Vec::with_capacity(MAX_COLORS);
-    selected_colors.push(sorted_iter.next().unwrap().0);
 
-    for (key, _value) in sorted_iter {
-        if selected_colors.len() < MAX_COLORS {
-            for selected_color in selected_colors.iter() {
-                if rgb_difference(key, selected_color) > RGB_TOLERANCE {
-                    selected_colors.push(*key);
-                    break;
-                }
-            }
-        } else {
+    for (key, _value) in sorted.iter() {
+        if selected_colors.len() >= MAX_COLORS {
             break;
+        } else if selected_colors
+            .iter()
+            .all(|color| rgb_difference(key, color) > RGB_TOLERANCE)
+        {
+            selected_colors.push(*key);
         }
     }
 
     selected_colors
 }
+
 #[allow(clippy::many_single_char_names)]
 fn rgb_difference(a: &Rgb<u8>, z: &Rgb<u8>) -> f32 {
-    //((a.0[0] as i16 - b.0[0] as i16).abs() + (a.0[1] as i16 - b.0[1] as i16).abs() +(a.0[2] as i16 - b.0[2] as i16).abs()) as u16
-    //(a.0[0] as i16 - b.0[0] as i16).abs().max((a.0[1] as i16 - b.0[1] as i16).abs().max(a.0[2] as i16 - b.0[2] as i16).abs()) as u16
-    //(a.0[0] as i16 - b.0[0] as i16).abs().max((a.0[1] as i16 - b.0[1] as i16).abs()).max((a.0[2] as i16 - b.0[2] as i16).abs()) as u16
-    /*(((a.0[0] as i32 - b.0[0] as i32) * (a.0[0] as i32 - b.0[0] as i32))
-    + ((a.0[1] as i32 - b.0[1] as i32) * (a.0[1] as i32 - b.0[1] as i32))
-    + ((a.0[2] as i32 - b.0[2] as i32) * (a.0[2] as i32 - b.0[2] as i32)))
-    .abs() as u16*/
     let (a, b, c) = pixel_rgb_to_hsv(a);
     let (d, e, f) = pixel_rgb_to_hsv(z);
 
