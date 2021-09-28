@@ -23,15 +23,9 @@ fn main() {
 
     let selected_colors = quantize(image.pixels());
 
-    let mut color_map: HashMap<Rgb<u8>, Rgb<u8>> = HashMap::with_capacity(image.len() / 2);
-    // Selected colors are themselves
-    for color in selected_colors.iter() {
-        color_map.insert(*color, *color);
-    }
-
     // Max complexity is O(n * max_colors)
     for color in image.pixels_mut() {
-        let quantized = color_map.entry(*color).or_insert({
+        let quantized = {
             let mut min_difference = f32::MAX;
             let mut min_difference_color = *color;
 
@@ -43,9 +37,9 @@ fn main() {
                 }
             }
             min_difference_color
-        });
+        };
 
-        *color = *quantized;
+        *color = quantized;
     }
 
     image.save(outname).expect("Failed to write out");
