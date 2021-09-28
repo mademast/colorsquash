@@ -49,7 +49,10 @@ fn main() {
     image.save(outname).expect("Failed to write out");
 }
 
-fn quantize(pixels: Pixels<Rgb<u8>>) -> Vec<Rgb<u8>> {
+fn quantize<'a, T>(pixels: T) -> Vec<Rgb<u8>>
+where
+    T: Iterator<Item = &'a Rgb<u8>>,
+{
     let mut colors: HashMap<Rgb<u8>, usize> = HashMap::new();
 
     //count pixels
