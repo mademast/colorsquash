@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env::args};
 
 use image::io::Reader as ImageReader;
-use image::{buffer::Pixels, Rgb};
+use image::Rgb;
 
 const MAX_COLORS: usize = 256;
 
