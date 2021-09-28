@@ -28,26 +28,22 @@ fn main() {
     }
 
     // Max complexity is O(n * max_colors)
-    for color in image.pixels() {
-        let mut min_difference = f32::MAX;
-        let mut min_difference_color = *color;
+    for color in image.pixels_mut() {
+        let quantized = color_map.entry(*color).or_insert({
+            let mut min_difference = f32::MAX;
+            let mut min_difference_color = *color;
 
-        for index in 0..selected_colors.len() {
-            let difference = rgb_difference(color, unsafe { selected_colors.get_unchecked(index) });
-            /*if difference == 0.0 {
-                continue 'sorted_colors;
-            }*/
-            if difference < min_difference {
-                min_difference = difference;
-                min_difference_color = unsafe { *selected_colors.get_unchecked(index) };
+            for selected_color in &selected_colors {
+                let difference = rgb_difference(color, selected_color);
+                if difference < min_difference {
+                    min_difference = difference;
+                    min_difference_color = *selected_color;
+                }
             }
-        }
+            min_difference_color
+        });
 
-        color_map.insert(*color, min_difference_color);
-    }
-
-    for pixel in image.pixels_mut() {
-        pixel.clone_from(color_map.get(pixel).unwrap());
+        *color = *quantized;
     }
 
     image.save(outname).expect("Failed to write out");
