@@ -7,7 +7,7 @@ fn main() {
     let before = Instant::now();
     let filename = args().nth(1).unwrap();
     let outname = args().nth(2).unwrap();
-    // The percent of RGB value difference a color has to surpass to be considere unique
+    // The percent of RGB value difference a color has to surpass to be considered unique
     let tolerance = 0.6;
     let rgb_tolerance = 10.0 * tolerance;
     let max_colors = 256;
@@ -25,6 +25,7 @@ fn main() {
 
     let mut colors: HashMap<Rgb<u8>, usize> = HashMap::new();
 
+    //count pixels
     for pixel in image.pixels() {
         match colors.get_mut(pixel) {
             None => {
@@ -41,7 +42,13 @@ fn main() {
     );
 
     let mut sorted: Vec<(Rgb<u8>, usize)> = colors.into_iter().collect();
-    sorted.sort_by(|a, b| a.1.cmp(&b.1).then(a.0 .0.cmp(&b.0 .0)).reverse());
+    sorted.sort_by(|(colour1, freq1), (colour2, freq2)| {
+        freq2
+            .cmp(freq1)
+            .then(colour2[0].cmp(&colour1[0]))
+            .then(colour2[1].cmp(&colour1[1]))
+            .then(colour2[2].cmp(&colour1[2]))
+    });
 
     println!("Sorted! Selecting colors...");
 
