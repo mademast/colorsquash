@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env::args, time::Instant};
+use std::{collections::HashMap, env::args};
 
 use image::io::Reader as ImageReader;
 use image::{buffer::Pixels, Rgb};
@@ -9,12 +9,9 @@ const TOLERANCE: f32 = 0.6;
 const RGB_TOLERANCE: f32 = 10.0 * TOLERANCE;
 
 fn main() {
-    let before = Instant::now();
     let filename = args().nth(1).unwrap();
     let outname = args().nth(2).unwrap();
     // The percent of RGB value difference a color has to surpass to be considered unique
-
-    println!("File is {}", &filename);
 
     let imageread = ImageReader::open(&filename).expect("Failed to open image!");
     let mut image = imageread
@@ -22,12 +19,7 @@ fn main() {
         .expect("Failed to decode image!")
         .into_rgb8();
 
-    println!("Decoded!");
-    let before_algo = Instant::now();
-
     let selected_colors = quantize(image.pixels());
-
-    println!("Selected {} colors! Creating map...", selected_colors.len());
 
     let mut color_map: HashMap<Rgb<u8>, Rgb<u8>> = HashMap::with_capacity(image.len() / 2);
     // Selected colors are themselves
@@ -54,37 +46,11 @@ fn main() {
         color_map.insert(*color, min_difference_color);
     }
 
-    println!("Mapped! Filling in image...");
-
     for pixel in image.pixels_mut() {
         pixel.clone_from(color_map.get(pixel).unwrap());
     }
 
-    println!(
-        "Filled! Took {}ms. Recounting colors...",
-        Instant::now().duration_since(before_algo).as_millis()
-    );
-
-    let mut recounted_colors = Vec::with_capacity(MAX_COLORS);
-    // Recount colors
-    for pixel in image.pixels() {
-        if !recounted_colors.contains(pixel) {
-            println!("Found unique color! Now {}", recounted_colors.len());
-            recounted_colors.push(*pixel);
-        }
-    }
-
-    println!(
-        "Aiming for a max of {} colors, got {}",
-        MAX_COLORS,
-        recounted_colors.len()
-    );
-
     image.save(outname).expect("Failed to write out");
-    println!(
-        "Took {}ms",
-        Instant::now().duration_since(before).as_millis()
-    );
 }
 
 fn quantize(pixels: Pixels<Rgb<u8>>) -> Vec<Rgb<u8>> {
@@ -131,7 +97,7 @@ fn quantize(pixels: Pixels<Rgb<u8>>) -> Vec<Rgb<u8>> {
 
     selected_colors
 }
-
+#[allow(clippy::many_single_char_names)]
 fn rgb_difference(a: &Rgb<u8>, z: &Rgb<u8>) -> f32 {
     //((a.0[0] as i16 - b.0[0] as i16).abs() + (a.0[1] as i16 - b.0[1] as i16).abs() +(a.0[2] as i16 - b.0[2] as i16).abs()) as u16
     //(a.0[0] as i16 - b.0[0] as i16).abs().max((a.0[1] as i16 - b.0[1] as i16).abs().max(a.0[2] as i16 - b.0[2] as i16).abs()) as u16
@@ -146,7 +112,7 @@ fn rgb_difference(a: &Rgb<u8>, z: &Rgb<u8>) -> f32 {
     (((c - f) * (c - f)) + ((a - d).abs() / 90.0) + (b - e).abs()) as f32
 }
 
-#[warn(clippy::float_cmp)]
+#[allow(clippy::float_cmp)]
 fn pixel_rgb_to_hsv(a: &Rgb<u8>) -> (f32, f32, f32) {
     let (r, g, b) = (
         a.0[0] as f32 / 256.0,
