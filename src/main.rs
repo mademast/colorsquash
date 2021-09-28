@@ -24,23 +24,19 @@ fn main() {
     let selected_colors = quantize(image.pixels());
 
     // Max complexity is O(n * max_colors)
-    for color in image.pixels_mut() {
-        let quantized = {
-            let mut min_difference = f32::MAX;
-            let mut min_difference_color = *color;
+    image.pixels_mut().par_bridge().for_each(|color| {
+        let mut min_difference = f32::MAX;
+        let mut min_difference_color = *color;
 
-            for selected_color in &selected_colors {
-                let difference = rgb_difference(color, selected_color);
-                if difference < min_difference {
-                    min_difference = difference;
-                    min_difference_color = *selected_color;
-                }
+        for selected_color in &selected_colors {
+            let difference = rgb_difference(color, selected_color);
+            if difference < min_difference {
+                min_difference = difference;
+                min_difference_color = *selected_color;
             }
-            min_difference_color
-        };
-
-        *color = quantized;
-    }
+        }
+        *color = min_difference_color
+    });
 
     image.save(outname).expect("Failed to write out");
 }
