@@ -1,5 +1,8 @@
 /target
 *.png
+*.PNG
+*.jpg
+*.JPG
 flamegraph.svg
 perf.data
 perf.data.old
