@@ -1,14 +1,16 @@
+use std::time::Instant;
 use std::{collections::HashMap, env::args};
 
 use image::io::Reader as ImageReader;
 use image::Rgb;
 
+use ahash::RandomState;
+
 use rayon::prelude::*;
 
-const MAX_COLORS: usize = 256;
+const MAX_COLORS: usize = 16;
 
-const TOLERANCE: f32 = 0.025;
-const RGB_TOLERANCE: f32 = 10.0 * TOLERANCE;
+const RGB_TOLERANCE: f32 = 0.25 + (1.0 - (MAX_COLORS as f32 / 256.0));
 
 fn main() {
     let filename = args().nth(1).unwrap();
@@ -21,31 +23,70 @@ fn main() {
         .expect("Failed to decode image!")
         .into_rgb8();
 
-    let selected_colors = quantize(image.pixels());
+    //let mem_before_sort = mallinfo().hblkhd as usize;
+    let start_sort = Instant::now();
+    let sorted_colors = unique_and_sort(image.pixels());
+    println!("Sort took {}s", start_sort.elapsed().as_secs_f32());
 
-    // Max complexity is O(n * max_colors)
-    image.pixels_mut().par_bridge().for_each(|color| {
-        let mut min_difference = f32::MAX;
-        let mut min_difference_color = *color;
+    //let mem_before_selection = mallinfo().hblkhd as usize;
+    let start_selection = Instant::now();
+    let selected_colors = select_colors(&sorted_colors);
+    println!(
+        "Color Selection took {}s. Count {}",
+        start_selection.elapsed().as_secs_f32(),
+        selected_colors.len()
+    );
 
-        for selected_color in &selected_colors {
-            let difference = rgb_difference(color, selected_color);
-            if difference < min_difference {
-                min_difference = difference;
-                min_difference_color = *selected_color;
+    let start_array = Instant::now();
+    let mut array = vec![0usize; 256 * 256 * 256];
+    println!(
+        "Array creation took {}s",
+        start_array.elapsed().as_secs_f32()
+    );
+
+    let start_map = Instant::now();
+
+    for (sorted, _) in &sorted_colors {
+        let mut min_diff = f32::MAX;
+        let mut min_index = usize::MAX;
+
+        for (index, selected) in selected_colors.iter().enumerate() {
+            let diff = rgb_difference(sorted, selected);
+            if diff < min_diff {
+                min_diff = diff;
+                min_index = index;
             }
         }
-        *color = min_difference_color
-    });
+
+        array[color_index(sorted)] = min_index;
+    }
+
+    println!(
+        "Creating color map {:.2}s",
+        start_map.elapsed().as_secs_f32()
+    );
+
+    let start_fill = Instant::now();
+    // Max complexity is O(n * max_colors)
+    for color in image.pixels_mut() {
+        let index = array[color_index(color)];
+
+        *color = selected_colors[index];
+    }
+    println!(
+        "Took {:.2}s to fill in the image.\nTotal time from sort {:.2}s",
+        start_fill.elapsed().as_secs_f32(),
+        start_sort.elapsed().as_secs_f32()
+    );
 
     image.save(outname).expect("Failed to write out");
 }
 
-fn quantize<'a, T>(pixels: T) -> Vec<Rgb<u8>>
+fn unique_and_sort<'a, T>(pixels: T) -> Vec<(Rgb<u8>, usize)>
 where
     T: Iterator<Item = &'a Rgb<u8>>,
 {
-    let mut colors: HashMap<Rgb<u8>, usize> = HashMap::new();
+    let mut colors: HashMap<Rgb<u8>, usize, RandomState> = HashMap::default();
 
     //count pixels
     for pixel in pixels {
@@ -66,6 +107,10 @@ where
             .then(colour2[2].cmp(&colour1[2]))
     });
 
+    sorted
+}
+
+fn select_colors(sorted: &[(Rgb<u8>, usize)]) -> Vec<Rgb<u8>> {
     let mut selected_colors: Vec<Rgb<u8>> = Vec::with_capacity(MAX_COLORS);
 
     for (key, _value) in sorted.iter() {
@@ -80,6 +125,11 @@ where
     }
 
     selected_colors
+}
+
+#[inline(always)]
+fn color_index(c: &Rgb<u8>) -> usize {
+    c.0[0] as usize * (256 * 256) + c.0[1] as usize * 256 + c.0[2] as usize
 }
 
 #[allow(clippy::many_single_char_names)]
