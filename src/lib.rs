@@ -31,6 +31,8 @@ impl<T: Count> Squasher<T> {
     /// Take an RGB image buffer and an output buffer. The function will fill
     /// the output buffer with indexes into the Palette.
     pub fn map_image(&mut self, image: &[u8], buffer: &mut [T]) {
+        // We have to map the colours of this image now because it might contain
+        // colours not present in the first image.
         let sorted = Self::unique_and_sort(image);
         self.map_selected(&sorted);
 
