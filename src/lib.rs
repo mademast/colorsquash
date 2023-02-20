@@ -3,6 +3,37 @@ use std::ops::Deref;
 
 use ahash::RandomState;
 
+pub struct ColorCollector {
+    colors: HashMap<Rgb, usize, RandomState>,
+}
+
+impl ColorCollector {
+    pub fn new() -> Self {
+        Self {
+            colors: HashMap::default(),
+        }
+    }
+
+    /// Wants an RGB buffer
+    pub fn add(&mut self, buffer: &[u8]) {
+        for pixel in buffer.chunks(3) {
+            let rgb = Rgb([pixel[0], pixel[1], pixel[2]]);
+
+            match self.colors.get_mut(&rgb) {
+                None => {
+                    self.colors.insert(rgb, 1);
+                }
+                Some(n) => *n += 1,
+            }
+        }
+    }
+
+    pub fn as_squasher<T: Count>(self, max_colors: T) -> Squasher<T> {
+        let sorted = Squasher::<T>::sort(self.colors);
+        Squasher::from_sorted(max_colors, sorted)
+    }
+}
+
 pub struct Squasher<T> {
     palette: Vec<(Rgb, usize)>,
     larget_count: usize,
@@ -15,6 +46,10 @@ impl<T: Count> Squasher<T> {
     /// equal to `16MB * std::mem::size_of(T)`
     pub fn new(max_colors: T, buffer: &[u8]) -> Self {
         let sorted = Self::unique_and_sort(buffer);
+        Self::from_sorted(max_colors, sorted)
+    }
+
+    fn from_sorted(max_colors: T, sorted: Vec<(Rgb, usize)>) -> Self {
         let selected = Self::select_colors(&sorted, max_colors);
 
         let mut this = Self {
@@ -36,6 +71,17 @@ impl<T: Count> Squasher<T> {
         let sorted = Self::unique_and_sort(image);
         self.map_selected(&sorted);
 
+        for (idx, color) in image.chunks(3).enumerate() {
+            let index = self.map[color_index(&Rgb([color[0], color[1], color[2]]))];
+
+            buffer[idx] = index;
+        }
+    }
+
+    /// Take an RGB image buffer and an output buffer. The function will fill
+    /// the output buffer with indexes into the Palette.
+    //TODO: gen- Better name?
+    pub fn map_unsafe(&self, image: &[u8], buffer: &mut [T]) {
         for (idx, color) in image.chunks(3).enumerate() {
             let index = self.map[color_index(&Rgb([color[0], color[1], color[2]]))];
 
@@ -74,7 +120,11 @@ impl<T: Count> Squasher<T> {
             }
         }
 
-        let mut sorted: Vec<(Rgb, usize)> = colors.into_iter().collect();
+        Self::sort(colors)
+    }
+
+    fn sort(map: HashMap<Rgb, usize, RandomState>) -> Vec<(Rgb, usize)> {
+        let mut sorted: Vec<(Rgb, usize)> = map.into_iter().collect();
         sorted.sort_by(|(colour1, freq1), (colour2, freq2)| {
             freq2
                 .cmp(freq1)
