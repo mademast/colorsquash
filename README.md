@@ -8,7 +8,7 @@ If the second most frequent colour is *different enough*, it will be selected
 as well. If it's not, it is skipped and the third one is tried. This continues
 until it selects the necessary amount of colours.
 
-[^1] (wikipedia: color quantization)[https://en.wikipedia.org/wiki/Color_quantization]
+[^1]: (wikipedia: color quantization)[https://en.wikipedia.org/wiki/Color_quantization]
 
 ### squash
 A CLI tool to quantize colours :D
