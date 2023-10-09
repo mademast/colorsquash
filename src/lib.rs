@@ -174,10 +174,11 @@ impl Squasher<u8> {
     /// # Returns
     /// The new size of the image
     pub fn map_over(&self, image: &mut [u8]) -> usize {
-        for idx in 0..image.len() {
+        for idx in 0..(image.len() / 3) {
             let rgb_idx = idx * 3;
             let color = RGB8::new(image[rgb_idx], image[rgb_idx + 1], image[rgb_idx + 2]);
             let color_index = self.map[color_index(&color)];
+
             image[idx] = color_index;
         }
 

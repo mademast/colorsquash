@@ -11,4 +11,6 @@ until it selects the necessary amount of colours.
 [^1] (wikipedia: color quantization)[https://en.wikipedia.org/wiki/Color_quantization]
 
 ### squash
-A CLI tool to quantize colours. Accepts a path to a PNG; exports an indexed PNG.
+A CLI tool to quantize colours :D
+
+Currently only takes PNG in the RGB colorspace and outputs indexed PNG.
