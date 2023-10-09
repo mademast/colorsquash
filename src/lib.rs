@@ -1,43 +1,12 @@
+use rgb::RGB8;
 use std::collections::HashMap;
-use std::ops::Deref;
 
-use ahash::RandomState;
-
-pub struct ColorCollector {
-    colors: HashMap<Rgb, usize, RandomState>,
-}
-
-impl ColorCollector {
-    pub fn new() -> Self {
-        Self {
-            colors: HashMap::default(),
-        }
-    }
-
-    /// Wants an RGB buffer
-    pub fn add(&mut self, buffer: &[u8]) {
-        for pixel in buffer.chunks(3) {
-            let rgb = Rgb([pixel[0], pixel[1], pixel[2]]);
-
-            match self.colors.get_mut(&rgb) {
-                None => {
-                    self.colors.insert(rgb, 1);
-                }
-                Some(n) => *n += 1,
-            }
-        }
-    }
-
-    pub fn as_squasher<T: Count>(self, max_colors: T) -> Squasher<T> {
-        let sorted = Squasher::<T>::sort(self.colors);
-        Squasher::from_sorted(max_colors, sorted)
-    }
-}
+type DiffFn = dyn Fn(&RGB8, &RGB8) -> f32;
 
 pub struct Squasher<T> {
-    palette: Vec<(Rgb, usize)>,
-    larget_count: usize,
+    palette: Vec<RGB8>,
     map: Vec<T>,
+    difference_fn: Box<DiffFn>,
 }
 
 impl<T: Count> Squasher<T> {
@@ -46,16 +15,28 @@ impl<T: Count> Squasher<T> {
     /// equal to `16MB * std::mem::size_of(T)`
     pub fn new(max_colors: T, buffer: &[u8]) -> Self {
         let sorted = Self::unique_and_sort(buffer);
-        Self::from_sorted(max_colors, sorted)
+        Self::from_sorted(max_colors, sorted, Box::new(rgb_difference))
     }
 
-    fn from_sorted(max_colors: T, sorted: Vec<(Rgb, usize)>) -> Self {
-        let selected = Self::select_colors(&sorted, max_colors);
+    /// Like [Squasher::new] but lets you pass your own difference function
+    /// to compare values while selecting colours. The default difference
+    /// function sums to difference between the RGB channels.
+    pub fn new_with_difference(
+        max_colors: T,
+        buffer: &[u8],
+        difference_fn: &'static DiffFn,
+    ) -> Self {
+        let sorted = Self::unique_and_sort(buffer);
+        Self::from_sorted(max_colors, sorted, Box::new(difference_fn))
+    }
+
+    fn from_sorted(max_colors: T, sorted: Vec<(RGB8, usize)>, difference_fn: Box<DiffFn>) -> Self {
+        let selected = Self::select_colors(&sorted, max_colors, difference_fn.as_ref());
 
         let mut this = Self {
             palette: selected,
-            larget_count: sorted.first().unwrap().1,
             map: vec![T::zero(); 256 * 256 * 256],
+            difference_fn,
         };
 
         this.map_selected(&sorted);
@@ -64,34 +45,44 @@ impl<T: Count> Squasher<T> {
     }
 
     /// Take an RGB image buffer and an output buffer. The function will fill
-    /// the output buffer with indexes into the Palette.
-    pub fn map_image(&mut self, image: &[u8], buffer: &mut [T]) {
+    /// the output buffer with indexes into the Palette. The output buffer should
+    /// be a third of the size of the image buffer.
+    pub fn map(&mut self, image: &[u8], buffer: &mut [T]) {
+        if buffer.len() * 3 < image.len() {
+            panic!("outout buffer too small to fit indexed image");
+        }
+
         // We have to map the colours of this image now because it might contain
         // colours not present in the first image.
         let sorted = Self::unique_and_sort(image);
         self.map_selected(&sorted);
 
         for (idx, color) in image.chunks(3).enumerate() {
-            let index = self.map[color_index(&Rgb([color[0], color[1], color[2]]))];
+            let index = self.map[color_index(&RGB8::new(color[0], color[1], color[2]))];
 
             buffer[idx] = index;
         }
     }
 
-    /// Take an RGB image buffer and an output buffer. The function will fill
-    /// the output buffer with indexes into the Palette.
+    /// Like [Squasher::map] but it doesn't recount the input image. This will
+    /// cause colors the Squasher hasn't seen before to come out as index 0 which
+    /// may be incorrect.
     //TODO: gen- Better name?
     pub fn map_unsafe(&self, image: &[u8], buffer: &mut [T]) {
+        if buffer.len() * 3 < image.len() {
+            panic!("outout buffer too small to fit indexed image");
+        }
+
         for (idx, color) in image.chunks(3).enumerate() {
-            let index = self.map[color_index(&Rgb([color[0], color[1], color[2]]))];
+            let index = self.map[color_index(&RGB8::new(color[0], color[1], color[2]))];
 
             buffer[idx] = index;
         }
     }
 
     /// Retrieve the palette this squasher is working from
-    pub fn palette(&self) -> Vec<Rgb> {
-        self.palette.iter().map(|ahh| ahh.0).collect()
+    pub fn palette(&self) -> &[RGB8] {
+        &self.palette
     }
 
     /// Retrieve the palette as bytes
@@ -99,18 +90,17 @@ impl<T: Count> Squasher<T> {
         self.palette
             .clone()
             .into_iter()
-            .map(|rgb| rgb.0.into_iter())
-            .flatten()
+            .flat_map(|rgb| [rgb.r, rgb.g, rgb.b].into_iter())
             .collect()
     }
 
     /// Takes an image buffer of RGB data and fill the color map
-    fn unique_and_sort(buffer: &[u8]) -> Vec<(Rgb, usize)> {
-        let mut colors: HashMap<Rgb, usize, RandomState> = HashMap::default();
+    fn unique_and_sort(buffer: &[u8]) -> Vec<(RGB8, usize)> {
+        let mut colors: HashMap<RGB8, usize> = HashMap::default();
 
         //count pixels
         for pixel in buffer.chunks(3) {
-            let rgb = Rgb([pixel[0], pixel[1], pixel[2]]);
+            let rgb = RGB8::new(pixel[0], pixel[1], pixel[2]);
 
             match colors.get_mut(&rgb) {
                 None => {
@@ -123,53 +113,48 @@ impl<T: Count> Squasher<T> {
         Self::sort(colors)
     }
 
-    fn sort(map: HashMap<Rgb, usize, RandomState>) -> Vec<(Rgb, usize)> {
-        let mut sorted: Vec<(Rgb, usize)> = map.into_iter().collect();
+    fn sort(map: HashMap<RGB8, usize>) -> Vec<(RGB8, usize)> {
+        let mut sorted: Vec<(RGB8, usize)> = map.into_iter().collect();
         sorted.sort_by(|(colour1, freq1), (colour2, freq2)| {
             freq2
                 .cmp(freq1)
-                .then(colour2[0].cmp(&colour1[0]))
-                .then(colour2[1].cmp(&colour1[1]))
-                .then(colour2[2].cmp(&colour1[2]))
+                .then(colour2.r.cmp(&colour1.r))
+                .then(colour2.g.cmp(&colour1.g))
+                .then(colour2.b.cmp(&colour1.b))
         });
 
         sorted
     }
 
-    fn select_colors(sorted: &[(Rgb, usize)], max_colors: T) -> Vec<(Rgb, usize)> {
+    fn select_colors(sorted: &[(RGB8, usize)], max_colors: T, difference: &DiffFn) -> Vec<RGB8> {
         #[allow(non_snake_case)]
-        let RGB_TOLERANCE: f32 = 0.04 * 256.0;
-        let mut selected_colors: Vec<(Rgb, usize)> = Vec::with_capacity(max_colors.as_usize());
+        let RGB_TOLERANCE: f32 = 0.01 * 768.0;
+        let mut selected_colors: Vec<(RGB8, usize)> = Vec::with_capacity(max_colors.as_usize());
 
         for (key, count) in sorted.iter() {
             if max_colors.le(&selected_colors.len()) {
                 break;
             } else if selected_colors
                 .iter()
-                .all(|color| rgb_difference(key, &color.0) > RGB_TOLERANCE)
+                .all(|color| difference(key, &color.0) > RGB_TOLERANCE)
             {
                 selected_colors.push((*key, *count));
             }
         }
 
         selected_colors
+            .into_iter()
+            .map(|(color, _count)| color)
+            .collect()
     }
 
-    fn map_selected(&mut self, sorted: &[(Rgb, usize)]) {
+    fn map_selected(&mut self, sorted: &[(RGB8, usize)]) {
         for (sorted, _) in sorted {
             let mut min_diff = f32::MAX;
             let mut min_index = usize::MAX;
 
-            for (index, (selected, count)) in self.palette.iter().enumerate() {
-                //let count_weight = *count as f32 / self.larget_count as f32;
-                let diff = rgb_difference(sorted, selected); // - count_weight * 64.0;
-
-                // This is kind of racist genny
-                /*if selected[0] + selected[1] + selected[2] < 72 {
-                    continue;
-                }*/
-
-                //println!("{diff} - {selected:?}");
+            for (index, selected) in self.palette.iter().enumerate() {
+                let diff = (self.difference_fn)(sorted, selected);
 
                 if diff.max(0.0) < min_diff {
                     min_diff = diff;
@@ -179,6 +164,24 @@ impl<T: Count> Squasher<T> {
 
             self.map[color_index(sorted)] = T::from_usize(min_index);
         }
+    }
+}
+
+impl Squasher<u8> {
+    /// Takes an RGB image buffer and writes the indicies to the first third of
+    /// that buffer. The buffer is not resized.
+    ///
+    /// # Returns
+    /// The new size of the image
+    pub fn map_over(&self, image: &mut [u8]) -> usize {
+        for idx in 0..image.len() {
+            let rgb_idx = idx * 3;
+            let color = RGB8::new(image[rgb_idx], image[rgb_idx + 1], image[rgb_idx + 2]);
+            let color_index = self.map[color_index(&color)];
+            image[idx] = color_index;
+        }
+
+        image.len() / 3
     }
 }
 
@@ -219,67 +222,16 @@ count_impl!(u32);
 count_impl!(u64);
 count_impl!(usize);
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Rgb([u8; 3]);
-
-impl Deref for Rgb {
-    type Target = [u8; 3];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[inline(always)]
-fn color_index(c: &Rgb) -> usize {
-    c.0[0] as usize * (256 * 256) + c.0[1] as usize * 256 + c.0[2] as usize
+fn color_index(c: &RGB8) -> usize {
+    c.r as usize * (256 * 256) + c.g as usize * 256 + c.b as usize
 }
 
+/// The default comparison function. Returns a sum of the channel differences.
+/// I.E. `|a.red - b.red| + |a.green - b.green| + |a.blue - b.blue|`
 #[allow(clippy::many_single_char_names)]
 #[inline(always)]
-fn rgb_difference(a: &Rgb, b: &Rgb) -> f32 {
+pub fn rgb_difference(a: &RGB8, b: &RGB8) -> f32 {
     let absdiff = |a: u8, b: u8| (a as f32 - b as f32).abs();
-
-    /*let hsv1 = pixel_rgb_to_hsv(a);
-    let hsv2 = pixel_rgb_to_hsv(b);*/
-
-    //let diff_max = 3.0;
-
-    absdiff(a.0[0], b.0[0]) + absdiff(a.0[1], b.0[1]) + absdiff(a.0[2], b.0[2])
-    /*(((hsv1.0 / 90.0) - (hsv2.0 / 90.0)).abs()
-    + (hsv1.1 - hsv2.1).abs()
-    + ((hsv1.2 - hsv1.2).abs()))
-    / diff_max*/
-}
-
-fn pixel_rgb_to_hsv(a: &Rgb) -> (f32, f32, f32) {
-    let (r, g, b) = (
-        a.0[0] as f32 / 256.0,
-        a.0[1] as f32 / 256.0,
-        a.0[2] as f32 / 256.0,
-    );
-
-    let value = r.max(g.max(b));
-    let x_min = r.min(g.min(b));
-    let chroma = value - x_min;
-
-    let hue = if chroma == 0.0 {
-        0.0
-    } else if value == r {
-        60.0 * ((g - b) / chroma)
-    } else if value == g {
-        60.0 * (2.0 + (b - r) / chroma)
-    } else if value == b {
-        60.0 * (4.0 + (r - g) / chroma)
-    } else {
-        unreachable!()
-    };
-
-    let value_saturation = if value == 0.0 { 0.0 } else { chroma / value };
-
-    /* Rotate the color wheel counter clockwise to the negative location
-          |       Keep the wheel in place and remove any full rotations
-     _____V____ _____V____
-    |          |          |*/
-    ((hue + 360.0) % 360.0, value_saturation * 2.0, value * 2.0)
+    absdiff(a.r, b.r) + absdiff(a.g, b.g) + absdiff(a.b, b.b)
 }
