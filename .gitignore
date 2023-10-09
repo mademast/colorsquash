@@ -3,6 +3,8 @@
 *.PNG
 *.jpg
 *.JPG
+*.gif
+*.GIF
 flamegraph.svg
 perf.data
 perf.data.old
