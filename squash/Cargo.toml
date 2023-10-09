@@ -6,5 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+colorsquash = { path = "..", version = "0.1.0" }
+anyhow = "1.0.75"
 camino = "1.1.6"
-png = "0.17.10"
+# time of writing:
+# png has a change to ignore extra iCCP blocks my test image needed. it hasn't
+# been released yet, so we're using the git here. the commit we require is e4b4811
+png = { git = "https://github.com/image-rs/image-png.git", rev = "f10238a1e886b228e7da5301e5c0f5011316f2d6" }
