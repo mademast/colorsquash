@@ -14,3 +14,4 @@ camino = "1.1.6"
 # been released yet, so we're using the git here. the commit we require is e4b4811
 png = { git = "https://github.com/image-rs/image-png.git", rev = "f10238a1e886b228e7da5301e5c0f5011316f2d6" }
 zune-jpeg = "0.3.17"
+gifed = { path = "../../gifed/gifed" }
