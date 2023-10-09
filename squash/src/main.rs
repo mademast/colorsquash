@@ -51,8 +51,7 @@ fn main() -> Result<(), anyhow::Error> {
 		}
 	};
 
-	let squasher =
-		Squasher::new_with_difference(color_count, &image.data, &colorsquash::redmean_difference);
+	let squasher = Squasher::new(color_count, &image.data);
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);
 
