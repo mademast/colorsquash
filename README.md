@@ -13,4 +13,4 @@ until it selects the necessary amount of colours.
 ### squash
 A CLI tool to quantize colours :D
 
-Currently only takes PNG in the RGB colorspace and outputs indexed PNG.
+Accepts JPEG and PNG as input and can output indexed PNG and GIF.
