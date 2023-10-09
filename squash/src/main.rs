@@ -1,9 +1,10 @@
 use std::{fs::File, io::BufWriter};
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use colorsquash::Squasher;
 use png::{ColorType, Decoder, Encoder};
+use zune_jpeg::{zune_core::colorspace::ColorSpace, JpegDecoder};
 
 fn main() -> Result<(), anyhow::Error> {
 	// I should use clap or at least getopt, but this is fine. It's 20LOC.
@@ -13,8 +14,13 @@ fn main() -> Result<(), anyhow::Error> {
 	};
 	let mut argv = std::env::args().skip(1);
 
-	let color_count: u8 = if let Some(Ok(count)) = argv.next().map(|r| r.parse()) {
-		count
+	let color_count: u8 = if let Some(Ok(count)) = argv.next().map(|r| r.parse::<usize>()) {
+		if count > 256 {
+			eprintln!("max colour count must be 256 or below");
+			std::process::exit(1);
+		} else {
+			(count - 1) as u8
+		}
 	} else {
 		usage()
 	};
@@ -31,11 +37,28 @@ fn main() -> Result<(), anyhow::Error> {
 		usage();
 	};
 
-	let mut image = get_png(input_path)?;
+	let mut image = match input_path.extension() {
+		None => {
+			eprintln!("can't determine input filetype!\nSupported input types: PNG, JPG");
+			std::process::exit(1);
+		}
+		Some("png") => get_png(input_path)?,
+		Some("jpg") | Some("jpeg") => get_jpg(input_path)?,
+		Some(ext) => {
+			eprintln!("unknown filetype '{ext}'!\nSupported input types: PNG, JPG");
+			std::process::exit(1);
+		}
+	};
 
 	let squasher = Squasher::new(color_count, &image.data);
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);
+
+	println!(
+		"selected {} colours of max {}",
+		squasher.palette().len(),
+		color_count
+	);
 
 	// PNG Output
 	let file = File::create(output_path)?;
@@ -78,6 +101,27 @@ fn get_png<P: AsRef<Utf8Path>>(path: P) -> Result<Image, anyhow::Error> {
 			data: data.to_vec(),
 		}),
 	}
+}
+
+fn get_jpg<P: AsRef<Utf8Path>>(path: P) -> Result<Image, anyhow::Error> {
+	let content = std::fs::read(path.as_ref())?;
+	let mut dec = JpegDecoder::new(&content);
+	let pixels = dec.decode()?;
+	let info = dec
+		.info()
+		.ok_or(anyhow!("image had no info; this should be impossible"))?;
+
+	let colorspace = dec.get_output_colorspace();
+	match colorspace {
+		Some(ColorSpace::RGB) => (),
+		_ => bail!("colorspace {colorspace:?} not supported"),
+	}
+
+	Ok(Image {
+		width: info.width as usize,
+		height: info.height as usize,
+		data: pixels,
+	})
 }
 
 struct Image {
