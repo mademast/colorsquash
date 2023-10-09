@@ -12,22 +12,24 @@ pub struct Squasher<T> {
 impl<T: Count> Squasher<T> {
     /// Creates a new squasher and allocates a new color map. A color map
     /// contains every 24-bit color and ends up with an amount of memory
-    /// equal to `16MB * std::mem::size_of(T)`
-    pub fn new(max_colors: T, buffer: &[u8]) -> Self {
+    /// equal to `16MB * std::mem::size_of(T)`.
+    ///
+    ///
+    pub fn new(max_colors_minus_one: T, buffer: &[u8]) -> Self {
         let sorted = Self::unique_and_sort(buffer);
-        Self::from_sorted(max_colors, sorted, Box::new(rgb_difference))
+        Self::from_sorted(max_colors_minus_one, sorted, Box::new(rgb_difference))
     }
 
     /// Like [Squasher::new] but lets you pass your own difference function
     /// to compare values while selecting colours. The default difference
     /// function sums to difference between the RGB channels.
     pub fn new_with_difference(
-        max_colors: T,
+        max_colors_minus_one: T,
         buffer: &[u8],
         difference_fn: &'static DiffFn,
     ) -> Self {
         let sorted = Self::unique_and_sort(buffer);
-        Self::from_sorted(max_colors, sorted, Box::new(difference_fn))
+        Self::from_sorted(max_colors_minus_one, sorted, Box::new(difference_fn))
     }
 
     fn from_sorted(max_colors: T, sorted: Vec<(RGB8, usize)>, difference_fn: Box<DiffFn>) -> Self {
@@ -132,7 +134,7 @@ impl<T: Count> Squasher<T> {
         let mut selected_colors: Vec<(RGB8, usize)> = Vec::with_capacity(max_colors.as_usize());
 
         for (key, count) in sorted.iter() {
-            if max_colors.le(&selected_colors.len()) {
+            if max_colors.le(&selected_colors.len().saturating_sub(1)) {
                 break;
             } else if selected_colors
                 .iter()
