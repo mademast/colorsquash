@@ -51,7 +51,7 @@ fn main() -> Result<(), anyhow::Error> {
 		}
 	};
 
-	let squasher = Squasher::new(color_count, &image.data);
+	let mut squasher = Squasher::new(color_count, &image.data);
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);
 
@@ -85,28 +85,36 @@ fn get_png<P: AsRef<Utf8Path>>(path: P) -> Result<Image, anyhow::Error> {
 	let decoder = Decoder::new(File::open(path.as_ref())?);
 	let mut reader = decoder.read_info()?;
 
-	let mut buf = vec![0; reader.output_buffer_size()];
-	let info = reader.next_frame(&mut buf)?;
-	let data = &buf[..info.buffer_size()];
-
-	println!(
-		"{}x{} * 3 = {} | out={}, bs={}",
-		info.width,
-		info.height,
-		info.width as usize * info.height as usize * 3,
-		buf.len(),
-		info.buffer_size()
-	);
+	let mut data = vec![0; reader.output_buffer_size()];
+	let info = reader.next_frame(&mut data)?;
+	data.resize(info.buffer_size(), 0);
 
 	let colors = info.color_type;
 	match colors {
-		ColorType::Grayscale | ColorType::GrayscaleAlpha | ColorType::Indexed | ColorType::Rgba => {
+		ColorType::Grayscale | ColorType::GrayscaleAlpha | ColorType::Indexed => {
 			bail!("colortype {colors:?} not supported")
+		}
+		ColorType::Rgba => {
+			let pixels = info.width as usize * info.height as usize;
+
+			// the first RGB is fine, we don't need to touch it
+			for idx in 1..pixels {
+				data[idx * 3] = data[idx * 4];
+				data[idx * 3 + 1] = data[idx * 4 + 1];
+				data[idx * 3 + 2] = data[idx * 4 + 2];
+			}
+			data.resize(pixels * 3, 0);
+
+			Ok(Image {
+				width: info.width as usize,
+				height: info.height as usize,
+				data,
+			})
 		}
 		ColorType::Rgb => Ok(Image {
 			width: info.width as usize,
 			height: info.height as usize,
-			data: data.to_vec(),
+			data,
 		}),
 	}
 }

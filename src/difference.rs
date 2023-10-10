@@ -1,6 +1,8 @@
 //! A set of difference functions you can use with [SquasherBuilder::difference]
 
-use rgb::RGB8;
+// rexport this so people don't need to add the rgb crate to their project. this
+// also helps avoid crate version mismatch
+pub use rgb::RGB8;
 
 /// A naïve comparison just summing the channel differences
 /// I.E. `|a.red - b.red| + |a.green - b.green| + |a.blue - b.blue|`
