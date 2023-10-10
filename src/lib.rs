@@ -53,7 +53,7 @@ impl<T: Count> Default for SquasherBuilder<T> {
 		Self {
 			max_colours: T::from_usize(255),
 			difference_fn: Box::new(difference::rgb_difference),
-			tolerance: 2.0,
+			tolerance: 1.0,
 		}
 	}
 }
@@ -75,7 +75,7 @@ impl<T: Count> Squasher<T> {
 		let mut this = Self::from_parts(
 			max_colors_minus_one,
 			Box::new(difference::rgb_difference),
-			2.0,
+			1.0,
 		);
 		this.recolor(buffer);
 

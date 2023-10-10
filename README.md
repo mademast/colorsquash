@@ -1,12 +1,11 @@
-Colorsquash is a colour quantization[^1] crate and algorithm.
-At it's core, it sorts the unique colours that appear in an image
-and selects the most frequent that are sufficiently different.
+| 24bit RGB | 256 color Indexed|
+| - | - |
+| ![a small dog laying on a concrete floor in an industrial building](https://nyble.dev/colorsquash/astro.jpg) | ![the same image in 256 color. there are some visual differences, but the two images look very similar](https://nyble.dev/colorsquash/astro_squash.gif) |
 
-To put it more clearly:  
-The most frequent colour is always selected and placed into the palette.
-If the second most frequent colour is *different enough*, it will be selected
-as well. If it's not, it is skipped and the third one is tried. This continues
-until it selects the necessary amount of colours.
+colorsquash is a colour quantization[^1] crate and algorithm.  
+At it's core, it sorts the colors of an image by how frequently
+they appear, greatest to least. It then goes through those colours
+and takes the top N colours that are sufficiently different.
 
 [^1]: [wikipedia: color quantization](https://en.wikipedia.org/wiki/Color_quantization)
 
