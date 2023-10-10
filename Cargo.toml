@@ -3,22 +3,14 @@ name = "colorsquash"
 version = "0.1.0"
 authors = ["gennyble <gen@nyble.dev>"]
 edition = "2021"
+license = "ISC"
+description = "A crate for quantizing colours with preference to the most frequently occuring"
+repository = "https://github.com/gennyble/colorsquash"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#image = "0.23.14"
-#ahash = "0.7.4"
-#libc = "0.2.103"
-#rayon = "*"
 rgb = "0.8.36"
-
-#[dependencies.kmeans_colors]
-#version = "0.3"
-#default-features = false
-
-[profile.release]
-debug = true
 
 [workspace]
 members = ["squash"]

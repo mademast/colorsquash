@@ -1,14 +1,22 @@
 [package]
 name = "squash"
 version = "0.1.0"
+authors = ["gennyble <gen@nyble.dev>"]
 edition = "2021"
+license = "ISC"
+description = "CLI tool for quantizing colours"
+repository = "https://github.com/gennyble/colorsquash/tree/main/squash"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# the meat 'o the thing! the meaning behind it all
 colorsquash = { path = "..", version = "0.1.0" }
+
+# just useful tools for writing binaries
 anyhow = "1.0.75"
 camino = "1.1.6"
+
 # time of writing:
 # png has a change to ignore extra iCCP blocks my test image needed. it hasn't
 # been released yet, so we're using the git here. the commit we require is e4b4811
