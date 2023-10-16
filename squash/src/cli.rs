@@ -17,8 +17,6 @@ pub struct Cli {
 struct BuildingCli {
 	pub color_count: Option<u8>,
 	pub tolerance: Option<f32>,
-	pub input: Option<Utf8PathBuf>,
-	pub output: Option<Utf8PathBuf>,
 }
 
 impl BuildingCli {
