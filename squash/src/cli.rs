@@ -2,6 +2,10 @@ use std::cmp::Ordering;
 
 use camino::Utf8PathBuf;
 
+const NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+
 pub struct Cli {
 	pub color_count: u8,
 	pub tolerance: Option<f32>,
@@ -120,9 +124,8 @@ pub fn build() -> Cli {
 					building.tolerance = Some(tol);
 				}
 			},
-			Some(("help", _)) => {
-				print_help();
-			}
+			Some(("help", _)) => print_help(),
+			Some(("version", _)) => print_version(),
 			Some((key, _)) => {
 				eprintln!("unrecognised key {key}");
 				std::process::exit(1);
@@ -144,7 +147,7 @@ pub fn build() -> Cli {
 }
 
 fn print_help() -> ! {
-	println!("usage: squash [arguments ...] <input> <output>\n");
+	println!("usage: {NAME} [arguments ...] <input> <output>\n");
 	println!("<input>  path to a jpeg or png file");
 	println!("<output> path to write a png or gif file to\n");
 	println!("ARGUMENTS:");
@@ -155,15 +158,14 @@ fn print_help() -> ! {
 	println!("        how different colours should be to be added to the palette");
 	println!("        a number > 0 and <= 100\n");
 	println!("    help= | -h | --help");
-	println!("        print this message and exit");
+	println!("        print this message and exit\n");
+	println!("    version= | -V | --version");
+	println!("        print the version and authors and exit");
 	std::process::exit(0)
 }
 
 fn print_version() -> ! {
-	let version = env!("CARGO_PKG_VERSION");
-	let authors = env!("CARGO_PKG_AUTHORS");
-
-	println!("squash version {version}");
-	println!("written by {authors}");
+	println!("squash version {VERSION}");
+	println!("written by {AUTHORS}");
 	std::process::exit(0)
 }
