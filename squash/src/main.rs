@@ -7,7 +7,7 @@ mod image;
 
 fn main() -> Result<(), anyhow::Error> {
 	//gen: I should use clap or at least getopt, but this is fine.
-	let cli = cli::get();
+	let cli = cli::build();
 
 	let mut image = match cli.in_type {
 		InType::Png => image::get_png(cli.input)?,
@@ -15,14 +15,13 @@ fn main() -> Result<(), anyhow::Error> {
 	};
 
 	let mut squasher = Squasher::new(cli.color_count, &image.data);
+
+	if let Some(tol) = cli.tolerance {
+		squasher.set_tolerance(tol);
+	}
+
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);
-
-	println!(
-		"selected {} colours of max {}",
-		squasher.palette().len(),
-		cli.color_count
-	);
 
 	match cli.out_type {
 		OutType::Png => image::save_png(image, squasher, cli.output),
