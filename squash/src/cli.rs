@@ -80,9 +80,12 @@ pub fn build() -> Cli {
 	for arg in std::env::args().skip(1) {
 		// Handle the special cases we want to obey.
 		// -h/--help are standards and, even though we're playing with a
-		// dd-style syntax, we want to respect these
+		// dd-style syntax, we want to respect these.
+		// we'll do -V/--version
 		if arg == "-h" || arg == "--help" {
 			print_help()
+		} else if arg == "-V" || arg == "--version" {
+			print_version()
 		}
 
 		match arg.split_once('=') {
@@ -153,5 +156,14 @@ fn print_help() -> ! {
 	println!("        a number > 0 and <= 100\n");
 	println!("    help= | -h | --help");
 	println!("        print this message and exit");
+	std::process::exit(0)
+}
+
+fn print_version() -> ! {
+	let version = env!("CARGO_PKG_VERSION");
+	let authors = env!("CARGO_PKG_AUTHORS");
+
+	println!("squash version {version}");
+	println!("written by {authors}");
 	std::process::exit(0)
 }
