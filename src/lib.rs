@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub mod difference;
 
-type DiffFn = dyn Fn(&RGB8, &RGB8) -> f32;
+use difference::DiffFn;
 
 pub struct SquasherBuilder<T> {
 	max_colours: T,
@@ -26,7 +26,8 @@ impl<T: Count> SquasherBuilder<T> {
 
 	/// The function to use to compare colours.
 	///
-	/// see the [difference] module for functions included with the crate.
+	/// see the [difference] module for functions included with the crate and
+	/// information on implementing your own.
 	pub fn difference(mut self, difference: &'static DiffFn) -> SquasherBuilder<T> {
 		self.difference_fn = Box::new(difference);
 		self
@@ -52,7 +53,7 @@ impl<T: Count> Default for SquasherBuilder<T> {
 	fn default() -> Self {
 		Self {
 			max_colours: T::from_usize(255),
-			difference_fn: Box::new(difference::rgb_difference),
+			difference_fn: Box::new(difference::rgb),
 			tolerance: 1.0,
 		}
 	}
@@ -72,11 +73,7 @@ impl<T: Count> Squasher<T> {
 	/// contains every 24-bit color and ends up with an amount of memory
 	/// equal to `16MB * std::mem::size_of(T)`.
 	pub fn new(max_colors_minus_one: T, buffer: &[u8]) -> Self {
-		let mut this = Self::from_parts(
-			max_colors_minus_one,
-			Box::new(difference::rgb_difference),
-			1.0,
-		);
+		let mut this = Self::from_parts(max_colors_minus_one, Box::new(difference::rgb), 1.0);
 		this.recolor(buffer);
 
 		this
@@ -86,6 +83,7 @@ impl<T: Count> Squasher<T> {
 		SquasherBuilder::new()
 	}
 
+	/// Set the tolerance
 	pub fn set_tolerance(&mut self, percent: f32) {
 		self.tolerance_percent = percent;
 	}
@@ -200,10 +198,6 @@ impl<T: Count> Squasher<T> {
 	/// Pick the colors in the palette from a Vec of colors sorted by number
 	/// of times they occur, high to low.
 	fn select_colors(&self, sorted: Vec<RGB8>) -> Vec<RGB8> {
-		// I made these numbers up
-		#[allow(non_snake_case)]
-		//let RGB_TOLERANCE: f32 = 0.01 * 765.0;
-		//let RGB_TOLERANCE: f32 = 36.0;
 		let tolerance = (self.tolerance_percent / 100.0) * 765.0;
 		let max_colours = self.max_colours_min1.as_usize() + 1;
 		let mut selected_colors: Vec<RGB8> = Vec::with_capacity(max_colours);
@@ -211,10 +205,9 @@ impl<T: Count> Squasher<T> {
 		for sorted_color in sorted {
 			if max_colours <= selected_colors.len() {
 				break;
-			} else if selected_colors
-				.iter()
-				.all(|color| (self.difference_fn)(&sorted_color, color) > tolerance)
-			{
+			} else if selected_colors.iter().all(|selected_color| {
+				(self.difference_fn)(selected_color, &sorted_color) > tolerance
+			}) {
 				selected_colors.push(sorted_color);
 			}
 		}
@@ -303,6 +296,7 @@ count_impl!(u32);
 count_impl!(u64);
 count_impl!(usize);
 
+/// Compute the color index into the big-map-of-all-colours.
 #[inline(always)]
 fn color_index(c: &RGB8) -> usize {
 	c.r as usize * (256 * 256) + c.g as usize * 256 + c.b as usize
