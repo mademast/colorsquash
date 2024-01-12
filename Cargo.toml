@@ -11,6 +11,7 @@ repository = "https://github.com/gennyble/colorsquash"
 
 [dependencies]
 rgb = "0.8.36"
+gifed = { path = "../gifed/gifed", optional = true }
 
 [workspace]
 members = ["squash"]
