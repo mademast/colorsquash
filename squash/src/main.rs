@@ -1,5 +1,5 @@
 use cli::DifferenceFn;
-use colorsquash::{Squasher, SquasherBuilder};
+use colorsquash::SquasherBuilder;
 
 use crate::cli::{InType, OutType};
 
@@ -23,8 +23,8 @@ fn main() -> Result<(), anyhow::Error> {
 	}
 
 	builder = match cli.difference {
-		DifferenceFn::Rgb => builder.difference(&colorsquash::difference::rgb_difference),
-		DifferenceFn::Redmean => builder.difference(&colorsquash::difference::redmean_difference),
+		DifferenceFn::Rgb => builder.difference(&colorsquash::difference::rgb),
+		DifferenceFn::Redmean => builder.difference(&colorsquash::difference::redmean),
 	};
 
 	let mut squasher = builder.build(&image.data);
