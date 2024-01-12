@@ -1,4 +1,5 @@
-use colorsquash::Squasher;
+use cli::DifferenceFn;
+use colorsquash::{Squasher, SquasherBuilder};
 
 use crate::cli::{InType, OutType};
 
@@ -7,6 +8,7 @@ mod image;
 
 fn main() -> Result<(), anyhow::Error> {
 	//gen: I should use clap or at least getopt, but this is fine.
+	//gen: I like experimenting with the cli :)
 	let cli = cli::build();
 
 	let mut image = match cli.in_type {
@@ -14,11 +16,18 @@ fn main() -> Result<(), anyhow::Error> {
 		InType::Jpeg => image::get_jpg(cli.input)?,
 	};
 
-	let mut squasher = Squasher::new(cli.color_count, &image.data);
+	let mut builder = SquasherBuilder::default().max_colors(cli.color_count);
 
 	if let Some(tol) = cli.tolerance {
-		squasher.set_tolerance(tol);
+		builder = builder.tolerance(tol);
 	}
+
+	builder = match cli.difference {
+		DifferenceFn::Rgb => builder.difference(&colorsquash::difference::rgb_difference),
+		DifferenceFn::Redmean => builder.difference(&colorsquash::difference::redmean_difference),
+	};
+
+	let mut squasher = builder.build(&image.data);
 
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);

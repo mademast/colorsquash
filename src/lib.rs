@@ -144,6 +144,13 @@ impl<T: Count> Squasher<T> {
 		}
 	}
 
+	#[cfg(feature = "gifed")]
+	pub fn palette_gifed(&self) -> gifed::block::Palette {
+		use rgb::ComponentBytes;
+
+		self.palette.as_slice().as_bytes().try_into().unwrap()
+	}
+
 	/// Retrieve the palette this squasher is working from
 	pub fn palette(&self) -> &[RGB8] {
 		&self.palette

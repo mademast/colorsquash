@@ -9,6 +9,7 @@ const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub struct Cli {
 	pub color_count: u8,
 	pub tolerance: Option<f32>,
+	pub difference: DifferenceFn,
 	pub input: Utf8PathBuf,
 	pub in_type: InType,
 	pub output: Utf8PathBuf,
@@ -21,6 +22,7 @@ pub struct Cli {
 struct BuildingCli {
 	pub color_count: Option<u8>,
 	pub tolerance: Option<f32>,
+	pub difference: DifferenceFn,
 }
 
 impl BuildingCli {
@@ -59,6 +61,7 @@ impl BuildingCli {
 		Cli {
 			color_count: self.color_count.unwrap_or(Self::DEFAULT_COLORS),
 			tolerance: self.tolerance,
+			difference: self.difference,
 			input,
 			in_type,
 			output,
@@ -75,6 +78,13 @@ pub enum InType {
 pub enum OutType {
 	Png,
 	Gif,
+}
+
+#[derive(Debug, Default)]
+pub enum DifferenceFn {
+	#[default]
+	Rgb,
+	Redmean,
 }
 
 pub fn build() -> Cli {
@@ -124,6 +134,15 @@ pub fn build() -> Cli {
 					building.tolerance = Some(tol);
 				}
 			},
+			Some(("difference", algo)) | Some(("dif", algo)) => match algo {
+				"rgb" => building.difference = DifferenceFn::Rgb,
+				"redmean" => building.difference = DifferenceFn::Redmean,
+				_ => {
+					eprintln!("'{algo}' is not recognized as an algorithm. See help=algorithms");
+					std::process::exit(1);
+				}
+			},
+			Some(("help", "algorithms")) => print_help_algorithms(),
 			Some(("help", _)) => print_help(),
 			Some(("version", _)) => print_version(),
 			Some((key, _)) => {
@@ -153,7 +172,11 @@ fn print_help() -> ! {
 	println!("ARGUMENTS:");
 	println!("    colors=<int> | clrs=<int>");
 	println!("        the number of colours the final image should contain");
-	println!("        a whole number more than 0 and less than, or equal, 256 [Default 256]\n");
+	println!("        a whole number more than 0 and less than, or equal, 256");
+	println!("        [Default 256]\n");
+	println!("    difference=<algorithm> | did=<algorithm>");
+	println!("        the color comparison function to use. one of: rgb, redmean");
+	println!("        for more details use help=algorithms. [Default rgb]");
 	println!("    tolerance=<float> | tol=<float>");
 	println!("        how different colours should be to be added to the palette");
 	println!("        a number > 0 and <= 100\n");
@@ -161,6 +184,18 @@ fn print_help() -> ! {
 	println!("        print this message and exit\n");
 	println!("    version= | -V | --version");
 	println!("        print the version and authors and exit");
+	std::process::exit(0)
+}
+
+fn print_help_algorithms() -> ! {
+	println!("ALGORITHMS");
+	println!("rgb:");
+	println!("    a straight, rather naïve, RGB comparison. It sums the channel");
+	println!("    differences. This is it, really:");
+	println!("    |a.red - b.red| + |a.green - b.green| + |a.blue - b.blue|\n");
+	println!("redmean:");
+	println!("    a slightly more intelligent algorithm that weighs the channels");
+	println!("    in an attempt to more better align with human color perception.");
 	std::process::exit(0)
 }
 

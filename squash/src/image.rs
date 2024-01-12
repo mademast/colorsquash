@@ -3,7 +3,7 @@ use std::{fs::File, io::BufWriter};
 use anyhow::{anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
 use colorsquash::Squasher;
-use gifed::writer::{GifBuilder, ImageBuilder};
+use gifed::{writer::ImageBuilder, Gif};
 use png::{ColorType, Decoder, Encoder};
 use zune_jpeg::{zune_core::colorspace::ColorSpace, JpegDecoder};
 
@@ -94,11 +94,10 @@ pub fn save_gif(
 	squasher: Squasher<u8>,
 	path: Utf8PathBuf,
 ) -> Result<(), anyhow::Error> {
-	GifBuilder::new(image.width as u16, image.height as u16)
-		.palette(squasher.palette_bytes().as_slice().try_into().unwrap())
-		.image(ImageBuilder::new(image.width as u16, image.height as u16).build(image.data)?)
-		.build()?
-		.save(path)?;
+	let mut gif = Gif::new(image.width as u16, image.height as u16);
+	gif.set_palette(Some(squasher.palette_gifed()));
+	gif.push(ImageBuilder::new(image.width as u16, image.height as u16).build(image.data)?);
+	gif.save(path)?;
 
 	Ok(())
 }
