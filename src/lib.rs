@@ -1,3 +1,5 @@
+#[cfg(kmeans)]
+use kmeans::{KMeans, KMeansConfig};
 use rgb::RGB8;
 use std::collections::HashMap;
 
@@ -91,10 +93,34 @@ impl<T: Count> Squasher<T> {
 	}
 
 	/// Create a new palette from the colours in the given image.
+	#[cfg(not(kmeans))]
 	pub fn recolor(&mut self, image: &[u8]) {
 		let sorted = Self::unique_and_sort(image);
 		let selected = self.select_colors(sorted);
 		self.palette = selected;
+	}
+
+	#[cfg(kmeans)]
+	pub fn recolor(&mut self, image: &[u8]) {
+		let kmean = KMeans::new(
+			image.iter().map(|u| *u as f32).collect::<Vec<f32>>(),
+			image.len() / 3,
+			3,
+		);
+		let k = self.max_colours_min1.as_usize() + 1;
+		let result =
+			kmean.kmeans_lloyd(k, 100, KMeans::init_kmeanplusplus, &KMeansConfig::default());
+		self.palette = result
+			.centroids
+			.chunks_exact(3)
+			.map(|rgb| {
+				RGB8::new(
+					rgb[0].round() as u8,
+					rgb[1].round() as u8,
+					rgb[2].round() as u8,
+				)
+			})
+			.collect();
 	}
 
 	/// Create a Squasher from parts. Noteably, this leave your palette empty
@@ -199,6 +225,7 @@ impl<T: Count> Squasher<T> {
 
 	/// Pick the colors in the palette from a Vec of colors sorted by number
 	/// of times they occur, high to low.
+	#[cfg(not(kmeans))]
 	fn select_colors(&self, sorted: Vec<RGB8>) -> Vec<RGB8> {
 		// I made these numbers up
 		#[allow(non_snake_case)]
