@@ -2,7 +2,7 @@ use std::{fs::File, io::BufWriter};
 
 use anyhow::{anyhow, bail};
 use camino::{Utf8Path, Utf8PathBuf};
-use colorsquash::Squasher;
+use colorsquash::{selection::SortSelect, Squasher};
 use gifed::{writer::ImageBuilder, Gif};
 use png::{ColorType, Decoder, Encoder};
 use zune_jpeg::{zune_core::colorspace::ColorSpace, JpegDecoder};

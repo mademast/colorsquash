@@ -13,6 +13,12 @@ and takes the top N colours that are sufficiently different.
 
 [^1]: [wikipedia: color quantization](https://en.wikipedia.org/wiki/Color_quantization)
 
+**features**
+
+**`kmeans`** - use kmeans for palette selection instead of sort & select.  
+**`gifed`** - adds the `Squasher::palette_gifed()` method allowing you to
+directly get a gifed's Palette struct.
+
 ### squash
 A CLI tool to quantize colours :D
 

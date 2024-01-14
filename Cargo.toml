@@ -1,7 +1,7 @@
 [package]
 name = "colorsquash"
-version = "0.1.0"
-authors = ["gennyble <gen@nyble.dev>"]
+version = "0.2.0"
+authors = ["gennyble <gen@nyble.dev>", "novedevo <devon@nove.dev>"]
 edition = "2021"
 license = "ISC"
 description = "A crate for quantizing colours with preference to the most frequently occuring"

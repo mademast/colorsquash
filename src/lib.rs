@@ -1,44 +1,52 @@
+use std::collections::HashSet;
+
 #[cfg(kmeans)]
 use kmeans::{KMeans, KMeansConfig};
 use rgb::{ComponentBytes, FromSlice, RGB8};
-use std::collections::HashMap;
 
 pub mod difference;
+pub mod selection;
 
 use difference::DiffFn;
+use selection::Selector;
 
-pub struct SquasherBuilder<T> {
+pub struct SquasherBuilder<T: Count> {
 	max_colours: T,
 	difference_fn: Box<DiffFn>,
-	tolerance: f32,
+	selector: Option<Box<dyn Selector + 'static>>,
 }
 
 impl<T: Count> SquasherBuilder<T> {
+	// I don't want a default here because, to me anyway, Default implies a
+	// working struct and this would panic build()
+	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
-		Self::default()
+		Self {
+			max_colours: T::zero(),
+			difference_fn: Box::new(difference::rgb),
+			selector: None,
+		}
 	}
 
 	/// The max number of colors selected for the palette, minus one.
 	///
 	/// `max_colors(255)` will attempt to make a 256 color palette
-	pub fn max_colors(mut self, max_minus_one: T) -> SquasherBuilder<T> {
+	pub fn max_colors(mut self, max_minus_one: T) -> Self {
 		self.max_colours = max_minus_one;
 		self
 	}
 
-	/// The function to use to compare colours.
+	/// The function to use to compare colours while mapping the image.
 	///
 	/// see the [difference] module for functions included with the crate and
 	/// information on implementing your own.
-	pub fn difference(mut self, difference: &'static DiffFn) -> SquasherBuilder<T> {
+	pub fn mapper_difference(mut self, difference: &'static DiffFn) -> Self {
 		self.difference_fn = Box::new(difference);
 		self
 	}
 
-	/// Percent colours have to differ by to be included into the palette.
-	/// between and including 0.0 to 100.0
-	pub fn tolerance(mut self, percent: f32) -> SquasherBuilder<T> {
-		self.tolerance = percent;
+	pub fn selector(mut self, selector: impl Selector + 'static) -> Self {
+		self.selector = Some(Box::new(selector));
 		self
 	}
 
@@ -47,20 +55,10 @@ impl<T: Count> SquasherBuilder<T> {
 		Img: Into<ImageData<'a>>,
 	{
 		let mut squasher =
-			Squasher::from_parts(self.max_colours, self.difference_fn, self.tolerance);
+			Squasher::from_parts(self.max_colours, self.difference_fn, self.selector.unwrap());
 		squasher.recolor(image);
 
 		squasher
-	}
-}
-
-impl<T: Count> Default for SquasherBuilder<T> {
-	fn default() -> Self {
-		Self {
-			max_colours: T::from_usize(255),
-			difference_fn: Box::new(difference::rgb),
-			tolerance: 1.0,
-		}
 	}
 }
 
@@ -69,19 +67,27 @@ pub struct Squasher<T> {
 	max_colours_min1: T,
 	palette: Vec<RGB8>,
 	map: Vec<T>,
+	selector: Box<dyn Selector + 'static>,
 	difference_fn: Box<DiffFn>,
-	tolerance_percent: f32,
 }
 
 impl<T: Count> Squasher<T> {
 	/// Creates a new squasher and allocates a new color map. A color map
 	/// contains every 24-bit color and ends up with an amount of memory
 	/// equal to `16MB * std::mem::size_of(T)`.
-	pub fn new<'a, Img>(max_colors_minus_one: T, buffer: Img) -> Self
+	pub fn new<'a, Img>(
+		max_colors_minus_one: T,
+		selector: impl Selector + 'static,
+		buffer: Img,
+	) -> Self
 	where
 		Img: Into<ImageData<'a>>,
 	{
-		let mut this = Self::from_parts(max_colors_minus_one, Box::new(difference::rgb), 1.0);
+		let mut this = Self::from_parts(
+			max_colors_minus_one,
+			Box::new(difference::rgb),
+			Box::new(selector),
+		);
 		this.recolor(buffer);
 
 		this
@@ -91,61 +97,28 @@ impl<T: Count> Squasher<T> {
 		SquasherBuilder::new()
 	}
 
-	/// Set the tolerance
-	pub fn set_tolerance(&mut self, percent: f32) {
-		self.tolerance_percent = percent;
-	}
-
 	/// Create a new palette from the colours in the given image.
-	#[cfg(not(kmeans))]
 	pub fn recolor<'a, Img>(&mut self, image: Img)
 	where
 		Img: Into<ImageData<'a>>,
 	{
-		let sorted = Self::unique_and_sort(image);
-		let selected = self.select_colors(sorted);
-		self.palette = selected;
-	}
-
-	#[cfg(kmeans)]
-	pub fn recolor<'a, Img>(&mut self, image: Img)
-	where
-		Img: Into<ImageData<'a>>,
-	{
-		let ImageData(rgb) = image.into();
-
-		let kmean = KMeans::new(
-			rgb.as_bytes()
-				.iter()
-				.map(|u| *u as f32)
-				.collect::<Vec<f32>>(),
-			rgb.as_bytes().len() / 3,
-			3,
-		);
-		let k = self.max_colours_min1.as_usize() + 1;
-		let result =
-			kmean.kmeans_lloyd(k, 100, KMeans::init_kmeanplusplus, &KMeansConfig::default());
-		self.palette = result
-			.centroids
-			.chunks_exact(3)
-			.map(|rgb| {
-				RGB8::new(
-					rgb[0].round() as u8,
-					rgb[1].round() as u8,
-					rgb[2].round() as u8,
-				)
-			})
-			.collect();
+		self.palette = self
+			.selector
+			.select(self.max_colours_min1.as_usize() + 1, image.into());
 	}
 
 	/// Create a Squasher from parts. Noteably, this leave your palette empty
-	fn from_parts(max_colours_min1: T, difference_fn: Box<DiffFn>, tolerance: f32) -> Self {
+	fn from_parts(
+		max_colours_min1: T,
+		difference_fn: Box<DiffFn>,
+		selector: Box<dyn Selector>,
+	) -> Self {
 		Self {
 			max_colours_min1,
 			palette: vec![],
 			map: vec![T::zero(); 256 * 256 * 256],
 			difference_fn,
-			tolerance_percent: tolerance,
+			selector,
 		}
 	}
 
@@ -164,8 +137,8 @@ impl<T: Count> Squasher<T> {
 
 		// We have to map the colours of this image now because it might contain
 		// colours not present in the first image.
-		let sorted = Self::unique_and_sort(rgb);
-		self.map_selected(&sorted);
+		let unique = Self::unique_colors(rgb);
+		self.map_selected(&unique);
 
 		for (idx, color) in rgb.iter().enumerate() {
 			buffer[idx] = self.map[color_index(color)];
@@ -206,64 +179,9 @@ impl<T: Count> Squasher<T> {
 		self.palette.as_bytes().to_owned()
 	}
 
-	/// Takes an image buffer of RGB data and fill the color map
-	fn unique_and_sort<'a, Img>(buffer: Img) -> Vec<RGB8>
-	where
-		Img: Into<ImageData<'a>>,
-	{
-		let ImageData(rgb) = buffer.into();
-		let mut colors: HashMap<RGB8, usize> = HashMap::default();
-
-		//count pixels
-		for px in rgb {
-			match colors.get_mut(px) {
-				None => {
-					colors.insert(*px, 1);
-				}
-				Some(n) => *n += 1,
-			}
-		}
-
-		Self::sort(colors)
-	}
-
-	fn sort(map: HashMap<RGB8, usize>) -> Vec<RGB8> {
-		let mut sorted: Vec<(RGB8, usize)> = map.into_iter().collect();
-		sorted.sort_by(|(colour1, freq1), (colour2, freq2)| {
-			freq2
-				.cmp(freq1)
-				.then(colour2.r.cmp(&colour1.r))
-				.then(colour2.g.cmp(&colour1.g))
-				.then(colour2.b.cmp(&colour1.b))
-		});
-
-		sorted.into_iter().map(|(color, _count)| color).collect()
-	}
-
-	/// Pick the colors in the palette from a Vec of colors sorted by number
-	/// of times they occur, high to low.
-	#[cfg(not(kmeans))]
-	fn select_colors(&self, sorted: Vec<RGB8>) -> Vec<RGB8> {
-		let tolerance = (self.tolerance_percent / 100.0) * 765.0;
-		let max_colours = self.max_colours_min1.as_usize() + 1;
-		let mut selected_colors: Vec<RGB8> = Vec::with_capacity(max_colours);
-
-		for sorted_color in sorted {
-			if max_colours <= selected_colors.len() {
-				break;
-			} else if selected_colors.iter().all(|selected_color| {
-				(self.difference_fn)(selected_color, &sorted_color) > tolerance
-			}) {
-				selected_colors.push(sorted_color);
-			}
-		}
-
-		selected_colors
-	}
-
 	/// Pick the closest colour in the palette for each unique color in the image
-	fn map_selected(&mut self, sorted: &[RGB8]) {
-		for colour in sorted {
+	fn map_selected(&mut self, unique: &[RGB8]) {
+		for colour in unique {
 			let mut min_diff = f32::MAX;
 			let mut min_index = usize::MAX;
 
@@ -279,6 +197,14 @@ impl<T: Count> Squasher<T> {
 			self.map[color_index(colour)] = T::from_usize(min_index);
 		}
 	}
+
+	fn unique_colors(image: &[RGB8]) -> Vec<RGB8> {
+		let mut unique: HashSet<RGB8> = HashSet::new();
+		for px in image {
+			unique.insert(*px);
+		}
+		unique.into_iter().collect()
+	}
 }
 
 impl Squasher<u8> {
@@ -288,15 +214,10 @@ impl Squasher<u8> {
 	/// # Returns
 	/// The new size of the image
 	pub fn map_over(&mut self, image: &mut [u8]) -> usize {
-		// "redundant slicing" here is to drop the mut on the reference because
-		// ImageData doesn't have a From<&mut [u8]> and I don't particularly want
-		// it to
-		#[allow(clippy::redundant_slicing)]
-		let sorted = Self::unique_and_sort(&image[..]);
-
 		// We have to map the colours of this image now because it might contain
 		// colours not present in the first image.
-		self.map_selected(&sorted);
+		let unique = Self::unique_colors(image.as_rgb());
+		self.map_selected(&unique);
 
 		for idx in 0..(image.len() / 3) {
 			let rgb_idx = idx * 3;

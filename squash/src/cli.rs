@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use camino::Utf8PathBuf;
+use colorsquash::difference::{self, DiffFn};
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -9,7 +10,8 @@ const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub struct Cli {
 	pub color_count: u8,
 	pub tolerance: Option<f32>,
-	pub difference: DifferenceFn,
+	pub selector: Selector,
+	pub difference: &'static DiffFn,
 	pub input: Utf8PathBuf,
 	pub in_type: InType,
 	pub output: Utf8PathBuf,
@@ -23,6 +25,7 @@ struct BuildingCli {
 	pub color_count: Option<u8>,
 	pub tolerance: Option<f32>,
 	pub difference: DifferenceFn,
+	pub selector: Selector,
 }
 
 impl BuildingCli {
@@ -58,10 +61,16 @@ impl BuildingCli {
 			}
 		};
 
+		let difference = match self.difference {
+			DifferenceFn::Rgb => &difference::rgb as &DiffFn,
+			DifferenceFn::Redmean => &difference::redmean as &DiffFn,
+		};
+
 		Cli {
 			color_count: self.color_count.unwrap_or(Self::DEFAULT_COLORS),
 			tolerance: self.tolerance,
-			difference: self.difference,
+			selector: self.selector,
+			difference,
 			input,
 			in_type,
 			output,
@@ -85,6 +94,13 @@ pub enum DifferenceFn {
 	#[default]
 	Rgb,
 	Redmean,
+}
+
+#[derive(Debug, Default)]
+pub enum Selector {
+	#[default]
+	SortSelect,
+	Kmeans,
 }
 
 pub fn build() -> Cli {
@@ -142,7 +158,16 @@ pub fn build() -> Cli {
 					std::process::exit(1);
 				}
 			},
+			Some(("selector", sel)) | Some(("sel", sel)) => match sel {
+				"sort/select" => building.selector = Selector::SortSelect,
+				"kmeans" => building.selector = Selector::Kmeans,
+				_ => {
+					eprintln!("'{sel}' is not recognized as a selector. See help=selectors");
+					std::process::exit(1);
+				}
+			},
 			Some(("help", "algorithms")) => print_help_algorithms(),
+			Some(("help", "selectors")) => print_help_selectors(),
 			Some(("help", _)) => print_help(),
 			Some(("version", _)) => print_version(),
 			Some((key, _)) => {
@@ -174,12 +199,16 @@ fn print_help() -> ! {
 	println!("        the number of colours the final image should contain");
 	println!("        a whole number more than 0 and less than, or equal, 256");
 	println!("        [Default 256]\n");
-	println!("    difference=<algorithm> | did=<algorithm>");
+	println!("    difference=<algorithm> | dif=<algorithm>");
 	println!("        the color comparison function to use. one of: rgb, redmean");
-	println!("        for more details use help=algorithms. [Default rgb]");
+	println!("        for more details use help=algorithms. [Default rgb]\n");
+	println!("    selection=<selector> | sel=<selector>");
+	println!("        the algorithm for picking the palette. one of: means, sort/select");
+	println!("        for more details use help=selectors. [Default sort/select]");
 	println!("    tolerance=<float> | tol=<float>");
 	println!("        how different colours should be to be added to the palette");
-	println!("        a number > 0 and <= 100\n");
+	println!("        only sort/select usese this value.");
+	println!("        a number > 0 and <= 100 [Default 3]\n");
 	println!("    help= | -h | --help");
 	println!("        print this message and exit\n");
 	println!("    version= | -V | --version");
@@ -196,6 +225,18 @@ fn print_help_algorithms() -> ! {
 	println!("redmean:");
 	println!("    a slightly more intelligent algorithm that weighs the channels");
 	println!("    in an attempt to more better align with human color perception.");
+	std::process::exit(0)
+}
+
+fn print_help_selectors() -> ! {
+	println!("SELECTORS:");
+	println!("sort/select:");
+	println!("    the original colorsquash algorithm. sorts colors from most to least");
+	println!("    frequent and then picks the most frequent colors so long as they are");
+	println!("    sufficiently different (configurable with tolerance=)\n");
+	println!("kmeans:");
+	println!("    uses the kmeans clustering algorithm to select colours.");
+	println!("    Ignores tolerance=");
 	std::process::exit(0)
 }
 

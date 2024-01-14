@@ -1,6 +1,6 @@
 [package]
 name = "squash"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["gennyble <gen@nyble.dev>"]
 edition = "2021"
 license = "ISC"
@@ -11,7 +11,7 @@ repository = "https://github.com/gennyble/colorsquash/tree/main/squash"
 
 [dependencies]
 # the meat 'o the thing! the meaning behind it all
-colorsquash = { path = "..", version = "0.1.0", features = ["gifed"] }
+colorsquash = { path = "..", version = "0.1.0", features = ["gifed", "kmeans"] }
 
 # just useful tools for writing binaries
 anyhow = "1.0.75"

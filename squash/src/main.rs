@@ -1,5 +1,8 @@
 use cli::DifferenceFn;
-use colorsquash::SquasherBuilder;
+use colorsquash::{
+	selection::{Kmeans, Selector, SortSelect},
+	SquasherBuilder,
+};
 
 use crate::cli::{InType, OutType};
 
@@ -16,15 +19,20 @@ fn main() -> Result<(), anyhow::Error> {
 		InType::Jpeg => image::get_jpg(cli.input)?,
 	};
 
-	let mut builder = SquasherBuilder::default().max_colors(cli.color_count);
+	let mut builder = SquasherBuilder::new()
+		.max_colors(cli.color_count)
+		.mapper_difference(cli.difference);
 
-	if let Some(tol) = cli.tolerance {
-		builder = builder.tolerance(tol);
-	}
+	match cli.selector {
+		cli::Selector::SortSelect => {
+			let mut sorsel = SortSelect::default().difference(cli.difference);
+			if let Some(tol) = cli.tolerance {
+				sorsel = sorsel.tolerance(tol)
+			}
 
-	builder = match cli.difference {
-		DifferenceFn::Rgb => builder.difference(&colorsquash::difference::rgb),
-		DifferenceFn::Redmean => builder.difference(&colorsquash::difference::redmean),
+			builder = builder.selector(sorsel);
+		}
+		cli::Selector::Kmeans => builder = builder.selector(Kmeans),
 	};
 
 	let mut squasher = builder.build(&image.data);
