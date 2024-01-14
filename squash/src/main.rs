@@ -1,6 +1,5 @@
-use cli::DifferenceFn;
 use colorsquash::{
-	selection::{Kmeans, Selector, SortSelect},
+	selection::{Kmeans, SortSelect},
 	SquasherBuilder,
 };
 
