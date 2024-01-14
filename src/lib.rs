@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 
-#[cfg(kmeans)]
-use kmeans::{KMeans, KMeansConfig};
 use rgb::{ComponentBytes, FromSlice, RGB8};
 
 pub mod difference;
