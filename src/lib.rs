@@ -1,4 +1,4 @@
-use rgb::RGB8;
+use rgb::{ComponentBytes, FromSlice, RGB8};
 use std::collections::HashMap;
 
 pub mod difference;
@@ -39,7 +39,10 @@ impl<T: Count> SquasherBuilder<T> {
 		self
 	}
 
-	pub fn build(self, image: &[u8]) -> Squasher<T> {
+	pub fn build<'a, Img>(self, image: Img) -> Squasher<T>
+	where
+		Img: Into<ImageData<'a>>,
+	{
 		let mut squasher =
 			Squasher::from_parts(self.max_colours, self.difference_fn, self.tolerance);
 		squasher.recolor(image);
@@ -71,7 +74,10 @@ impl<T: Count> Squasher<T> {
 	/// Creates a new squasher and allocates a new color map. A color map
 	/// contains every 24-bit color and ends up with an amount of memory
 	/// equal to `16MB * std::mem::size_of(T)`.
-	pub fn new(max_colors_minus_one: T, buffer: &[u8]) -> Self {
+	pub fn new<'a, Img>(max_colors_minus_one: T, buffer: Img) -> Self
+	where
+		Img: Into<ImageData<'a>>,
+	{
 		let mut this = Self::from_parts(
 			max_colors_minus_one,
 			Box::new(difference::rgb_difference),
@@ -91,7 +97,10 @@ impl<T: Count> Squasher<T> {
 	}
 
 	/// Create a new palette from the colours in the given image.
-	pub fn recolor(&mut self, image: &[u8]) {
+	pub fn recolor<'a, Img>(&mut self, image: Img)
+	where
+		Img: Into<ImageData<'a>>,
+	{
 		let sorted = Self::unique_and_sort(image);
 		let selected = self.select_colors(sorted);
 		self.palette = selected;
@@ -111,43 +120,47 @@ impl<T: Count> Squasher<T> {
 	/// Take an RGB image buffer and an output buffer. The function will fill
 	/// the output buffer with indexes into the Palette. The output buffer should
 	/// be a third of the size of the image buffer.
-	pub fn map(&mut self, image: &[u8], buffer: &mut [T]) {
-		if buffer.len() * 3 < image.len() {
-			panic!("outout buffer too small to fit indexed image");
+	pub fn map<'a, Img>(&mut self, image: Img, buffer: &mut [T])
+	where
+		Img: Into<ImageData<'a>>,
+	{
+		let ImageData(rgb) = image.into();
+
+		if buffer.len() * 3 < rgb.len() {
+			panic!("output buffer too small to fit indexed image");
 		}
 
 		// We have to map the colours of this image now because it might contain
 		// colours not present in the first image.
-		let sorted = Self::unique_and_sort(image);
+		let sorted = Self::unique_and_sort(rgb);
 		self.map_selected(&sorted);
 
-		for (idx, color) in image.chunks(3).enumerate() {
-			let index = self.map[color_index(&RGB8::new(color[0], color[1], color[2]))];
-
-			buffer[idx] = index;
+		for (idx, color) in rgb.iter().enumerate() {
+			buffer[idx] = self.map[color_index(color)];
 		}
 	}
 
 	/// Like [Squasher::map] but it doesn't recount the input image. This will
 	/// cause colors the Squasher hasn't seen before to come out as index 0 which
-	/// may be incorrect.
+	/// may be incorrect!
 	//TODO: gen- Better name?
-	pub fn map_unsafe(&self, image: &[u8], buffer: &mut [T]) {
-		if buffer.len() * 3 < image.len() {
-			panic!("outout buffer too small to fit indexed image");
+	pub fn map_no_recolor<'a, Img>(&self, image: Img, buffer: &mut [T])
+	where
+		Img: Into<ImageData<'a>>,
+	{
+		let ImageData(rgb) = image.into();
+
+		if buffer.len() * 3 < rgb.len() {
+			panic!("output buffer too small to fit indexed image");
 		}
 
-		for (idx, color) in image.chunks(3).enumerate() {
-			let index = self.map[color_index(&RGB8::new(color[0], color[1], color[2]))];
-
-			buffer[idx] = index;
+		for (idx, color) in rgb.iter().enumerate() {
+			buffer[idx] = self.map[color_index(color)];
 		}
 	}
 
 	#[cfg(feature = "gifed")]
 	pub fn palette_gifed(&self) -> gifed::block::Palette {
-		use rgb::ComponentBytes;
-
 		self.palette.as_slice().as_bytes().try_into().unwrap()
 	}
 
@@ -158,24 +171,22 @@ impl<T: Count> Squasher<T> {
 
 	/// Retrieve the palette as bytes
 	pub fn palette_bytes(&self) -> Vec<u8> {
-		self.palette
-			.clone()
-			.into_iter()
-			.flat_map(|rgb| [rgb.r, rgb.g, rgb.b].into_iter())
-			.collect()
+		self.palette.as_bytes().to_owned()
 	}
 
 	/// Takes an image buffer of RGB data and fill the color map
-	fn unique_and_sort(buffer: &[u8]) -> Vec<RGB8> {
+	fn unique_and_sort<'a, Img>(buffer: Img) -> Vec<RGB8>
+	where
+		Img: Into<ImageData<'a>>,
+	{
+		let ImageData(rgb) = buffer.into();
 		let mut colors: HashMap<RGB8, usize> = HashMap::default();
 
 		//count pixels
-		for pixel in buffer.chunks(3) {
-			let rgb = RGB8::new(pixel[0], pixel[1], pixel[2]);
-
-			match colors.get_mut(&rgb) {
+		for px in rgb {
+			match colors.get_mut(px) {
 				None => {
-					colors.insert(rgb, 1);
+					colors.insert(*px, 1);
 				}
 				Some(n) => *n += 1,
 			}
@@ -249,9 +260,14 @@ impl Squasher<u8> {
 	/// # Returns
 	/// The new size of the image
 	pub fn map_over(&mut self, image: &mut [u8]) -> usize {
+		// "redundant slicing" here is to drop the mut on the reference because
+		// ImageData doesn't have a From<&mut [u8]> and I don't particularly want
+		// it to
+		#[allow(clippy::redundant_slicing)]
+		let sorted = Self::unique_and_sort(&image[..]);
+
 		// We have to map the colours of this image now because it might contain
 		// colours not present in the first image.
-		let sorted = Self::unique_and_sort(image);
 		self.map_selected(&sorted);
 
 		for idx in 0..(image.len() / 3) {
@@ -302,6 +318,26 @@ count_impl!(u16);
 count_impl!(u32);
 count_impl!(u64);
 count_impl!(usize);
+
+pub struct ImageData<'a>(&'a [RGB8]);
+
+impl<'a> From<&'a Vec<u8>> for ImageData<'a> {
+	fn from(plain: &'a Vec<u8>) -> Self {
+		ImageData(plain.as_rgb())
+	}
+}
+
+impl<'a> From<&'a [u8]> for ImageData<'a> {
+	fn from(plain: &'a [u8]) -> Self {
+		ImageData(plain.as_rgb())
+	}
+}
+
+impl<'a> From<&'a [RGB8]> for ImageData<'a> {
+	fn from(rgb: &'a [RGB8]) -> Self {
+		ImageData(rgb)
+	}
+}
 
 #[inline(always)]
 fn color_index(c: &RGB8) -> usize {
