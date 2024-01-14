@@ -10,7 +10,9 @@ use crate::{
 };
 
 pub trait Selector {
-	fn select<'a>(&mut self, max_colors: usize, image: ImageData<'a>) -> Vec<RGB8>;
+	// wanted Into<ImageData> here but rustc got mad about vtable building
+	// because we store this as Box<dyn Selector> in Squasher and it's builder
+	fn select(&mut self, max_colors: usize, image: ImageData) -> Vec<RGB8>;
 }
 
 pub struct SortSelect {
@@ -21,7 +23,7 @@ pub struct SortSelect {
 impl Selector for SortSelect {
 	/// Pick the colors in the palette from a Vec of colors sorted by number
 	/// of times they occur, high to low.
-	fn select<'a>(&mut self, max_colours: usize, image: ImageData<'a>) -> Vec<RGB8> {
+	fn select(&mut self, max_colours: usize, image: ImageData) -> Vec<RGB8> {
 		let sorted = Self::unique_and_sort(image);
 		let tolerance = (self.tolerance / 100.0) * 765.0;
 		let mut selected_colors: Vec<RGB8> = Vec::with_capacity(max_colours);
@@ -107,8 +109,8 @@ pub struct Kmeans;
 
 #[cfg(feature = "kmeans")]
 impl Selector for Kmeans {
-	fn select<'a>(&mut self, max_colors: usize, image: ImageData<'a>) -> Vec<RGB8> {
-		let ImageData(rgb) = image.into();
+	fn select(&mut self, max_colors: usize, image: ImageData) -> Vec<RGB8> {
+		let ImageData(rgb) = image;
 
 		let kmean = KMeans::new(
 			rgb.as_bytes()
