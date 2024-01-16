@@ -11,6 +11,7 @@ use difference::DiffFn;
 use selection::Selector;
 
 pub struct SquasherBuilder<T: Count> {
+	scale: u8,
 	max_colours: T,
 	difference_fn: Box<DiffFn>,
 	selector: Option<Box<dyn Selector + 'static>>,
@@ -23,6 +24,7 @@ impl<T: Count> SquasherBuilder<T> {
 	pub fn new() -> Self {
 		Self {
 			max_colours: T::zero(),
+			scale: 100,
 			difference_fn: Box::new(difference::rgb),
 			selector: None,
 		}
@@ -33,6 +35,13 @@ impl<T: Count> SquasherBuilder<T> {
 	/// `max_colors(255)` will attempt to make a 256 color palette
 	pub fn max_colors(mut self, max_minus_one: T) -> Self {
 		self.max_colours = max_minus_one;
+		self
+	}
+
+	/// The percent of pixels to consider while selecting the palette for the
+	/// image. Integer between 1 and 100 (inclusive)
+	pub fn scale(mut self, scale: u8) -> Self {
+		self.scale = scale;
 		self
 	}
 
@@ -54,8 +63,12 @@ impl<T: Count> SquasherBuilder<T> {
 	where
 		Img: Into<ImageData<'a>>,
 	{
-		let mut squasher =
-			Squasher::from_parts(self.max_colours, self.difference_fn, self.selector.unwrap());
+		let mut squasher = Squasher::from_parts(
+			self.scale,
+			self.max_colours,
+			self.difference_fn,
+			self.selector.unwrap(),
+		);
 		squasher.recolor(image);
 
 		squasher
@@ -67,6 +80,7 @@ pub struct Squasher<T> {
 	max_colours_min1: T,
 	palette: Vec<RGB8>,
 	map: Vec<T>,
+	scale: u8,
 	selector: Box<dyn Selector + 'static>,
 	difference_fn: Box<DiffFn>,
 }
@@ -84,6 +98,7 @@ impl<T: Count> Squasher<T> {
 		Img: Into<ImageData<'a>>,
 	{
 		let mut this = Self::from_parts(
+			100,
 			max_colors_minus_one,
 			Box::new(difference::rgb),
 			Box::new(selector),
@@ -102,13 +117,31 @@ impl<T: Count> Squasher<T> {
 	where
 		Img: Into<ImageData<'a>>,
 	{
+		let data = image.into();
+
+		let nth = 100 / self.scale as usize;
+		let count = data.0.len() / nth;
+		let mut scaled = vec![RGB8::default(); count];
+		#[allow(clippy::needless_range_loop)] // sorry clippy, i like it
+		for idx in 0..count {
+			scaled[idx] = data.0[idx * nth];
+		}
+
 		self.palette = self
 			.selector
-			.select(self.max_colours_min1.as_usize() + 1, image.into());
+			.select(self.max_colours_min1.as_usize() + 1, ImageData(&scaled));
+	}
+
+	/// A number between 1 and 100 (inclusive) for how many pixels of the image
+	/// to consider when selecting the palette.
+	pub fn set_scale(&mut self, scale: u8) {
+		assert!(scale > 0 && scale <= 100);
+		self.scale = scale;
 	}
 
 	/// Create a Squasher from parts. Noteably, this leave your palette empty
 	fn from_parts(
+		scale: u8,
 		max_colours_min1: T,
 		difference_fn: Box<DiffFn>,
 		selector: Box<dyn Selector>,
@@ -117,6 +150,7 @@ impl<T: Count> Squasher<T> {
 			max_colours_min1,
 			palette: vec![],
 			map: vec![T::zero(); 256 * 256 * 256],
+			scale,
 			difference_fn,
 			selector,
 		}
