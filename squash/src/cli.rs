@@ -10,12 +10,14 @@ const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub struct Cli {
 	pub color_count: u8,
 	pub tolerance: Option<f32>,
+	pub scale: u8,
 	pub selector: Selector,
 	pub difference: &'static DiffFn,
 	pub input: Utf8PathBuf,
 	pub in_type: InType,
 	pub output: Utf8PathBuf,
 	pub out_type: OutType,
+	pub verbose: bool,
 }
 
 // It's not a builder, but I think the builder/building name is useful
@@ -24,8 +26,10 @@ pub struct Cli {
 struct BuildingCli {
 	pub color_count: Option<u8>,
 	pub tolerance: Option<f32>,
+	pub scale: Option<u8>,
 	pub difference: DifferenceFn,
 	pub selector: Selector,
+	pub verbose: bool,
 }
 
 impl BuildingCli {
@@ -70,11 +74,13 @@ impl BuildingCli {
 			color_count: self.color_count.unwrap_or(Self::DEFAULT_COLORS),
 			tolerance: self.tolerance,
 			selector: self.selector,
+			scale: self.scale.unwrap_or(25),
 			difference,
 			input,
 			in_type,
 			output,
 			out_type,
+			verbose: self.verbose,
 		}
 	}
 }
@@ -150,6 +156,19 @@ pub fn build() -> Cli {
 					building.tolerance = Some(tol);
 				}
 			},
+			Some(("scale", scale)) => match scale.parse::<u8>() {
+				Err(_) => {
+					eprintln!("scale must be >= 1 and <= 100");
+					std::process::exit(1);
+				}
+				Ok(scale) if scale < 1 || scale > 100 => {
+					eprintln!("scale must be >= 1 and <= 100");
+					std::process::exit(1);
+				}
+				Ok(scale) => {
+					building.scale = Some(scale);
+				}
+			},
 			Some(("difference", algo)) | Some(("dif", algo)) => match algo {
 				"rgb" => building.difference = DifferenceFn::Rgb,
 				"redmean" => building.difference = DifferenceFn::Redmean,
@@ -166,6 +185,9 @@ pub fn build() -> Cli {
 					std::process::exit(1);
 				}
 			},
+			Some(("loud", _)) | Some(("verbose", _)) => {
+				building.verbose = true;
+			}
 			Some(("help", "algorithms")) => print_help_algorithms(),
 			Some(("help", "selectors")) => print_help_selectors(),
 			Some(("help", _)) => print_help(),
@@ -199,6 +221,9 @@ fn print_help() -> ! {
 	println!("        the number of colours the final image should contain");
 	println!("        a whole number more than 0 and less than, or equal, 256");
 	println!("        [Default 256]\n");
+	println!("    scale=<int>");
+	println!("        the percent of pixels to consider when selecting the palette");
+	println!("        for the image. Whole number 1 to 100, inclusive. [Default 25]\n");
 	println!("    difference=<algorithm> | dif=<algorithm>");
 	println!("        the color comparison function to use. one of: rgb, redmean");
 	println!("        for more details use help=algorithms. [Default rgb]\n");
@@ -209,6 +234,8 @@ fn print_help() -> ! {
 	println!("        how different colours should be to be added to the palette");
 	println!("        only sort/select usese this value.");
 	println!("        a number > 0 and <= 100 [Default 3]\n");
+	println!("    loud= | verbose=");
+	println!("        print information about the image and palette.\n");
 	println!("    help= | -h | --help");
 	println!("        print this message and exit\n");
 	println!("    version= | -V | --version");
