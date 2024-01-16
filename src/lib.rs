@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use rgb::{ComponentBytes, FromSlice, RGB8};
 
 pub mod difference;
+mod nih_kmeans;
 pub mod selection;
 
 use difference::DiffFn;
