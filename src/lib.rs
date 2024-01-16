@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use rgb::{ComponentBytes, FromSlice, RGB8};
 
 pub mod difference;
+#[cfg(not(feature = "simd-kmeans"))]
 mod nih_kmeans;
 pub mod selection;
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[cfg(rand)]
+#[cfg(feature = "rand")]
 use rand::{prelude::*, seq::index::sample};
 use rgb::{RGB, RGB8};
 

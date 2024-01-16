@@ -13,6 +13,13 @@ repository = "https://github.com/gennyble/colorsquash"
 rgb = "0.8.36"
 gifed = { path = "../gifed/gifed", optional = true }
 rand = { version = "0.8.5", optional = true }
+kmeans = { version = "0.2.1", optional = true }
+
+[features]
+default = ["simd-kmeans"]
+# use the kmeans crate instead of the internal kmeans implementation. the crate
+# is faster and uses SIMD but requries nightly Rust.
+simd-kmeans = ["kmeans"]
 
 [workspace]
 members = ["squash"]

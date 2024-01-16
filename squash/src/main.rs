@@ -31,10 +31,12 @@ fn main() -> Result<(), anyhow::Error> {
 
 			builder = builder.selector(sorsel);
 		}
-		cli::Selector::Kmeans => builder = builder.selector(Kmeans),
+		cli::Selector::Kmeans => builder = builder.selector(Kmeans { max_iter: 10 }),
 	};
 
+	let start = std::time::Instant::now();
 	let mut squasher = builder.build(&image.data);
+	println!("{:.2}ms", start.elapsed().as_secs_f32());
 
 	let size = squasher.map_over(&mut image.data);
 	image.data.resize(size, 0);
