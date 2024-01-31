@@ -161,7 +161,7 @@ pub fn build() -> Cli {
 					eprintln!("scale must be >= 1 and <= 100");
 					std::process::exit(1);
 				}
-				Ok(scale) if scale < 1 || scale > 100 => {
+				Ok(scale) if (1..=100).contains(&scale) => {
 					eprintln!("scale must be >= 1 and <= 100");
 					std::process::exit(1);
 				}
@@ -178,7 +178,7 @@ pub fn build() -> Cli {
 				}
 			},
 			Some(("selector", sel)) | Some(("sel", sel)) => match sel {
-				"sort/select" => building.selector = Selector::SortSelect,
+				"sort/select" | "sorsel" => building.selector = Selector::SortSelect,
 				"kmeans" => building.selector = Selector::Kmeans,
 				_ => {
 					eprintln!("'{sel}' is not recognized as a selector. See help=selectors");
@@ -257,7 +257,7 @@ fn print_help_algorithms() -> ! {
 
 fn print_help_selectors() -> ! {
 	println!("SELECTORS:");
-	println!("sort/select:");
+	println!("sorsel:");
 	println!("    the original colorsquash algorithm. sorts colors from most to least");
 	println!("    frequent and then picks the most frequent colors so long as they are");
 	println!("    sufficiently different (configurable with tolerance=)\n");
