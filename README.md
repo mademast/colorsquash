@@ -13,11 +13,16 @@ and takes the top N colours that are sufficiently different.
 
 [^1]: [wikipedia: color quantization](https://en.wikipedia.org/wiki/Color_quantization)
 
-**features**
+**library features**
 
-**`kmeans`** - use kmeans for palette selection instead of sort & select.  
 **`gifed`** - adds the `Squasher::palette_gifed()` method allowing you to
 directly get a gifed's Palette struct.
+
+**colour selection algorithms**
+
+*`Sorsel`* - sorts colors most to least frequent and then picks the top colours that are different enough than the colours already picked.  
+*`KMeans`* - use k-means clustering to select the palette.  
+*`HighestBits`* - bit-shift the color components until all of the colors fit in the palette.
 
 ### squash
 A CLI tool to quantize colours :D
