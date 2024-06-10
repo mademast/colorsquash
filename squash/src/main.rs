@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use colorsquash::{
-	selection::{Kmeans, SortSelect},
+	selection::{HighestBits, Kmeans, SortSelect},
 	SquasherBuilder,
 };
 
@@ -34,6 +34,7 @@ fn main() -> Result<(), anyhow::Error> {
 			builder = builder.selector(sorsel);
 		}
 		cli::Selector::Kmeans => builder = builder.selector(Kmeans { max_iter: 10 }),
+		cli::Selector::HighestBits => builder = builder.selector(HighestBits {}),
 	};
 
 	let mut start = std::time::Instant::now();

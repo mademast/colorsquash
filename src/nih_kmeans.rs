@@ -91,7 +91,7 @@ impl KMeans {
 			.unwrap()
 	}
 
-	#[cfg(rand)]
+	#[cfg(feature = "rand")]
 	fn get_centroid_seeds_random(&self, k: usize) -> Vec<RGB<f32>> {
 		if k >= self.samples.len() {
 			return self.samples.iter().map(|&v| v.into()).collect();

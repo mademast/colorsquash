@@ -107,6 +107,7 @@ pub enum Selector {
 	#[default]
 	SortSelect,
 	Kmeans,
+	HighestBits,
 }
 
 pub fn build() -> Cli {
@@ -180,6 +181,7 @@ pub fn build() -> Cli {
 			Some(("selector", sel)) | Some(("sel", sel)) => match sel {
 				"sort/select" | "sorsel" => building.selector = Selector::SortSelect,
 				"kmeans" => building.selector = Selector::Kmeans,
+				"highest-bits" => building.selector = Selector::HighestBits,
 				_ => {
 					eprintln!("'{sel}' is not recognized as a selector. See help=selectors");
 					std::process::exit(1);
@@ -263,6 +265,10 @@ fn print_help_selectors() -> ! {
 	println!("    sufficiently different (configurable with tolerance=)\n");
 	println!("kmeans:");
 	println!("    uses the kmeans clustering algorithm to select colours.");
+	println!("    Ignores tolerance=");
+	println!("highest-bits:");
+	println!("    quantizes the colours by shifting the bits of their components until");
+	println!("    they all fit in the palette.");
 	println!("    Ignores tolerance=");
 	std::process::exit(0)
 }

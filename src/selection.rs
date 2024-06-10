@@ -339,6 +339,7 @@ impl Selector for HighestBits {
 	fn select(&mut self, max_colors: usize, image: ImageData) -> Vec<RGB8> {
 		let max_bits = max_colors.next_power_of_two().ilog2() / 3;
 		let shift = 8 - max_bits;
+
 		image
 			.0
 			.iter()
