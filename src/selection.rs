@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[cfg(not(feature = "simd-kmeans"))]
 use crate::nih_kmeans::KMeans;
@@ -330,5 +330,27 @@ impl Default for HeuristicSorsel {
 			max_attempts: 10,
 			difference_fn: Box::new(difference::rgb),
 		}
+	}
+}
+
+pub struct HighestBits {}
+
+impl Selector for HighestBits {
+	fn select(&mut self, max_colors: usize, image: ImageData) -> Vec<RGB8> {
+		let max_bits = max_colors.next_power_of_two().ilog2() / 3;
+		let shift = 8 - max_bits;
+		image
+			.0
+			.iter()
+			.map(|color| {
+				RGB8::new(
+					color.r >> shift << shift,
+					color.g >> shift << shift,
+					color.b >> shift << shift,
+				)
+			})
+			.collect::<HashSet<_>>()
+			.into_iter()
+			.collect()
 	}
 }
