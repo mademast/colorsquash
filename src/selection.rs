@@ -337,17 +337,28 @@ pub struct HighestBits {}
 
 impl Selector for HighestBits {
 	fn select(&mut self, max_colors: usize, image: ImageData) -> Vec<RGB8> {
-		let max_bits = max_colors.next_power_of_two().ilog2() / 3;
-		let shift = 8 - max_bits;
+		let bits = max_colors.next_power_of_two().ilog2();
+		let leftover = bits % 3;
+		let shift = 8 - (bits / 3);
+
+		//TODO: gen- we're taking red/green here because, as i remember, they
+		// are the colours to which we are most sensetive? but it would be cool
+		// if this was selectable
+		let (rshift, gshift, bshift) = match leftover {
+			0 => (shift, shift, shift),
+			1 => (shift, shift - 1, shift),
+			2 => (shift - 1, shift - 1, shift),
+			_ => unreachable!(),
+		};
 
 		image
 			.0
 			.iter()
 			.map(|color| {
 				RGB8::new(
-					color.r >> shift << shift,
-					color.g >> shift << shift,
-					color.b >> shift << shift,
+					color.r >> rshift << rshift,
+					color.g >> gshift << gshift,
+					color.b >> bshift << bshift,
 				)
 			})
 			.collect::<HashSet<_>>()
