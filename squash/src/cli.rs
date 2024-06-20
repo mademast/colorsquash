@@ -265,7 +265,7 @@ fn print_help_selectors() -> ! {
 	println!("    sufficiently different (configurable with tolerance=)\n");
 	println!("kmeans:");
 	println!("    uses the kmeans clustering algorithm to select colours.");
-	println!("    Ignores tolerance=");
+	println!("    Ignores tolerance=\n");
 	println!("highest-bits:");
 	println!("    quantizes the colours by shifting the bits of their components until");
 	println!("    they all fit in the palette.");
