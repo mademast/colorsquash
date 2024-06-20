@@ -231,10 +231,10 @@ fn print_help() -> ! {
 	println!("        for more details use help=algorithms. [Default rgb]\n");
 	println!("    selection=<selector> | sel=<selector>");
 	println!("        the algorithm for picking the palette. one of: means, sort/select");
-	println!("        for more details use help=selectors. [Default sort/select]");
+	println!("        for more details use help=selectors. [Default sorsel]\n");
 	println!("    tolerance=<float> | tol=<float>");
 	println!("        how different colours should be to be added to the palette");
-	println!("        only sort/select usese this value.");
+	println!("        only sorsel usese this value.");
 	println!("        a number > 0 and <= 100 [Default 3]\n");
 	println!("    loud= | verbose=");
 	println!("        print information about the image and palette.\n");
